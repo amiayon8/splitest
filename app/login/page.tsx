@@ -3,17 +3,20 @@
 import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
-import { ArrowRight, Lock, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, Lock, Mail, User, CheckCircle2 } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/";
 
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const establishSession = () => {
     document.cookie = `splitest_session=authenticated; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
@@ -24,6 +27,7 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setErrorMsg("");
+    setSuccessMsg("");
     const supabase = getSupabaseClient();
     if (!supabase) {
       establishSession();
@@ -47,11 +51,12 @@ function LoginForm() {
     }
   };
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
     setIsLoading(true);
     setErrorMsg("");
+    setSuccessMsg("");
 
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -60,30 +65,56 @@ function LoginForm() {
     }
 
     try {
-      if (password) {
-        const { error } = await supabase.auth.signInWithPassword({
+      if (authMode === "signup") {
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
-        });
-        if (error) {
-          setErrorMsg(error.message);
-          setIsLoading(false);
-          return;
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
           options: {
+            data: {
+              full_name: fullName || email.split("@")[0],
+            },
             emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           },
         });
+
         if (error) {
           setErrorMsg(error.message);
           setIsLoading(false);
           return;
         }
+
+        if (data.session) {
+          establishSession();
+        } else {
+          setSuccessMsg("Account created! Please check your email to confirm your sign up.");
+          setIsLoading(false);
+        }
+      } else {
+        if (password) {
+          const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (error) {
+            setErrorMsg(error.message);
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+            },
+          });
+          if (error) {
+            setErrorMsg(error.message);
+            setIsLoading(false);
+            return;
+          }
+        }
+        establishSession();
       }
-      establishSession();
     } catch {
       establishSession();
     }
@@ -107,6 +138,39 @@ function LoginForm() {
         </div>
 
         <div className="bg-white dark:bg-[#0F172A] rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8 shadow-sm">
+          <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-900/60 rounded-2xl mb-6">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("signin");
+                setErrorMsg("");
+                setSuccessMsg("");
+              }}
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                authMode === "signin"
+                  ? "bg-white dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 shadow-xs"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("signup");
+                setErrorMsg("");
+                setSuccessMsg("");
+              }}
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                authMode === "signup"
+                  ? "bg-white dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 shadow-xs"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={handleGoogleLogin}
@@ -131,7 +195,9 @@ function LoginForm() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            Continue with Google
+            <span>
+              {authMode === "signup" ? "Sign up with Google" : "Continue with Google"}
+            </span>
           </button>
 
           <div className="flex items-center my-6 gap-3">
@@ -142,7 +208,26 @@ function LoginForm() {
             <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1" />
           </div>
 
-          <form onSubmit={handleEmailAuth} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {authMode === "signup" && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Full name
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Alex Rivera"
+                    required={authMode === "signup"}
+                    className="w-full h-11 px-4 pl-10 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981] focus:ring-1 focus:ring-[#059669]"
+                  />
+                  <User className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-3.5" />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Email address
@@ -163,7 +248,7 @@ function LoginForm() {
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Password (optional for magic link)
+                  {authMode === "signup" ? "Password" : "Password (optional for magic link)"}
                 </label>
               </div>
               <div className="relative">
@@ -171,7 +256,9 @@ function LoginForm() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Leave empty for magic link"
+                  placeholder={authMode === "signup" ? "Create a secure password" : "Leave empty for magic link"}
+                  required={authMode === "signup"}
+                  minLength={authMode === "signup" ? 6 : undefined}
                   className="w-full h-11 px-4 pl-10 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981] focus:ring-1 focus:ring-[#059669]"
                 />
                 <Lock className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-3.5" />
@@ -184,25 +271,55 @@ function LoginForm() {
               </p>
             )}
 
+            {successMsg && (
+              <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 p-2.5 rounded-xl">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isLoading}
               className="w-full h-12 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm disabled:opacity-50"
             >
-              Sign In
+              {authMode === "signup" ? "Create Account" : "Sign In"}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
-            <button
-              type="button"
-              onClick={establishSession}
-              className="w-full h-10 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] hover:bg-slate-200/80 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-            >
-              <ShieldCheck className="w-4 h-4 text-[#059669] dark:text-[#34D399]" />
-              Quick Preview (Demo Session)
-            </button>
+          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-center">
+            {authMode === "signin" ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Don&apos;t have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signup");
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                  }}
+                  className="font-bold text-[#059669] dark:text-[#34D399] hover:underline"
+                >
+                  Sign Up
+                </button>
+              </p>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                  }}
+                  className="font-bold text-[#059669] dark:text-[#34D399] hover:underline"
+                >
+                  Sign In
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -212,7 +329,9 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] dark:bg-[#090D16]" />}>
+    <Suspense
+      fallback={<div className="min-h-screen bg-[#F8FAFC] dark:bg-[#090D16]" />}
+    >
       <LoginForm />
     </Suspense>
   );

@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+const STATIC_FILE_EXTENSION_REGEX =
+  /\.(?:svg|png|jpg|jpeg|gif|webp|ico|bmp|tiff|mp4|webm|ogv|mp3|wav|ogg|m4a|woff|woff2|ttf|eot|otf|json|txt|xml|pdf|csv|zip|wasm)$/i;
+
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
@@ -7,17 +10,15 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/fonts') ||
     pathname.startsWith('/api') ||
-    pathname === '/favicon.ico' ||
-    pathname === '/manifest.json' ||
-    pathname.startsWith('/icons')
+    pathname.startsWith('/icons') ||
+    STATIC_FILE_EXTENSION_REGEX.test(pathname)
   ) {
     return NextResponse.next();
   }
 
   const hasSession =
     request.cookies.has('sb-access-token') ||
-    request.cookies.has('splitest_session') ||
-    request.cookies.has('splitest_demo_auth');
+    request.cookies.has('splitest_session');
 
   if (pathname === '/login') {
     if (hasSession && !searchParams.has('force')) {
@@ -43,5 +44,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|bmp|tiff|mp4|webm|ogv|mp3|wav|ogg|m4a|woff|woff2|ttf|eot|otf|json|txt|xml|pdf|csv|zip|wasm)$).*)',
+  ],
 };
