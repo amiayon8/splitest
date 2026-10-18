@@ -20,6 +20,7 @@ import {
   cacheItems,
   getCachedItems,
   setCachedItem,
+  deleteCachedItem,
   queueMutation,
   getPendingMutations,
   removePendingMutation,
@@ -730,94 +731,108 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      const rawSupabaseGroups = groupsResponse.data || [];
+      const hasMockGroupInDb = rawSupabaseGroups.some((item) => item.id === 'group-bali-retreat');
+      if (hasMockGroupInDb) {
+        void client.from('groups').delete().eq('id', 'group-bali-retreat');
+      }
+
       const fetchedMembers = membersResponse.data || [];
-      const builtGroups: Group[] = (groupsResponse.data || []).map((item) => ({
-        id: item.id,
-        name: item.name,
-        icon: item.icon || 'Users',
-        category: item.category || 'Trip',
-        description: item.description,
-        defaultCurrency: item.default_currency || 'USD',
-        simplifyDebts: item.simplify_debts ?? true,
-        userRole:
-          item.user_role === 'owner' || item.user_role === 'editor' || item.user_role === 'viewer'
-            ? item.user_role
-            : 'editor',
-        createdAt: item.created_at,
-        members: fetchedMembers
-          .filter((m) => m.group_id === item.id)
-          .map((m) => ({
-            id: m.id,
-            groupId: m.group_id,
-            name: m.name,
-            email: m.email,
-            avatarUrl: m.avatar_url || (m.email ? getGravatarUrl(m.email) : ''),
-            role: m.role === 'owner' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'editor',
-            isCurrentUser: m.is_current_user || false,
-          })),
-      }));
+      const builtGroups: Group[] = rawSupabaseGroups
+        .filter((item) => item.id !== 'group-bali-retreat')
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          icon: item.icon || 'Users',
+          category: item.category || 'Trip',
+          description: item.description,
+          defaultCurrency: item.default_currency || 'USD',
+          simplifyDebts: item.simplify_debts ?? true,
+          userRole:
+            item.user_role === 'owner' || item.user_role === 'editor' || item.user_role === 'viewer'
+              ? item.user_role
+              : 'editor',
+          createdAt: item.created_at,
+          members: fetchedMembers
+            .filter((m) => m.group_id === item.id)
+            .map((m) => ({
+              id: m.id,
+              groupId: m.group_id,
+              name: m.name,
+              email: m.email,
+              avatarUrl: m.avatar_url || (m.email ? getGravatarUrl(m.email) : ''),
+              role: m.role === 'owner' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'editor',
+              isCurrentUser: m.is_current_user || false,
+            })),
+        }));
 
       const fetchedSplits = splitsResponse.data || [];
       const fetchedComments = commentsResponse.data || [];
 
-      const builtExpenses: Expense[] = (expensesResponse.data || []).map((exp) => ({
-        id: exp.id,
-        groupId: exp.group_id,
-        description: exp.description,
-        amount: Number(exp.amount),
-        currencyCode: exp.currency_code || 'USD',
-        exchangeRateToGroup: Number(exp.exchange_rate_to_group) || 1.0,
-        category: exp.category,
-        paidByName: exp.paid_by_name || 'You',
-        splitMethod: exp.split_method || 'equal',
-        date: exp.date,
-        hasReceipt: exp.has_receipt,
-        createdAt: exp.created_at,
-        splits: fetchedSplits
-          .filter((s) => s.expense_id === exp.id)
-          .map((s) => ({
-            id: s.id,
-            expenseId: s.expense_id,
-            memberName: s.member_name,
-            shareAmount: Number(s.share_amount),
-            percentage: s.percentage ? Number(s.percentage) : undefined,
-            shares: s.shares ? Number(s.shares) : undefined,
-          })),
-        comments: fetchedComments
-          .filter((c) => c.expense_id === exp.id)
-          .map((c) => ({
-            id: c.id,
-            expenseId: c.expense_id,
-            authorName: c.author_name,
-            content: c.content,
-            createdAt: c.created_at,
-          })),
-      }));
+      const builtExpenses: Expense[] = (expensesResponse.data || [])
+        .filter((exp) => exp.group_id !== 'group-bali-retreat')
+        .map((exp) => ({
+          id: exp.id,
+          groupId: exp.group_id,
+          description: exp.description,
+          amount: Number(exp.amount),
+          currencyCode: exp.currency_code || 'USD',
+          exchangeRateToGroup: Number(exp.exchange_rate_to_group) || 1.0,
+          category: exp.category,
+          paidByName: exp.paid_by_name || 'You',
+          splitMethod: exp.split_method || 'equal',
+          date: exp.date,
+          hasReceipt: exp.has_receipt,
+          createdAt: exp.created_at,
+          splits: fetchedSplits
+            .filter((s) => s.expense_id === exp.id)
+            .map((s) => ({
+              id: s.id,
+              expenseId: s.expense_id,
+              memberName: s.member_name,
+              shareAmount: Number(s.share_amount),
+              percentage: s.percentage ? Number(s.percentage) : undefined,
+              shares: s.shares ? Number(s.shares) : undefined,
+            })),
+          comments: fetchedComments
+            .filter((c) => c.expense_id === exp.id)
+            .map((c) => ({
+              id: c.id,
+              expenseId: c.expense_id,
+              authorName: c.author_name,
+              content: c.content,
+              createdAt: c.created_at,
+            })),
+        }));
 
-      const builtSettlements: Settlement[] = (settlementsResponse.data || []).map((set) => ({
-        id: set.id,
-        groupId: set.group_id,
-        payerName: set.payer_name,
-        recipientName: set.recipient_name,
-        amount: Number(set.amount),
-        currencyCode: set.currency_code || 'USD',
-        method: set.method,
-        notes: set.notes,
-        createdAt: set.created_at,
-      }));
+      const builtSettlements: Settlement[] = (settlementsResponse.data || [])
+        .filter((set) => set.group_id !== 'group-bali-retreat')
+        .map((set) => ({
+          id: set.id,
+          groupId: set.group_id,
+          payerName: set.payer_name,
+          recipientName: set.recipient_name,
+          amount: Number(set.amount),
+          currencyCode: set.currency_code || 'USD',
+          method: set.method,
+          notes: set.notes,
+          createdAt: set.created_at,
+        }));
 
-      const builtChatMessages: GroupChatMessage[] = (chatResponse.data || []).map((c) => ({
-        id: c.id,
-        groupId: c.group_id,
-        senderName: c.sender_name,
-        senderAvatarUrl: c.sender_avatar_url,
-        senderIsCurrentUser: c.sender_is_current_user,
-        content: c.content,
-        mentions: c.mentions || [],
-        attachment: c.attachment || undefined,
-        likes: c.likes || [],
-        createdAt: c.created_at,
-      }));
+      const builtChatMessages: GroupChatMessage[] = (chatResponse.data || [])
+        .filter((c) => c.group_id !== 'group-bali-retreat')
+        .map((c) => ({
+          id: c.id,
+          groupId: c.group_id,
+          senderName: c.sender_name,
+          senderAvatarUrl: c.sender_avatar_url,
+          senderIsCurrentUser: c.sender_is_current_user,
+          content: c.content,
+          mentions: c.mentions || [],
+          attachment: c.attachment || undefined,
+          likes: c.likes || [],
+          createdAt: c.created_at,
+        }));
 
       const builtFriends: FriendContact[] = (friendsResponse.data || []).map((f) => ({
         id: f.id,
@@ -906,10 +921,19 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         const cachedFriends = await getCachedItems<FriendContact>('friends');
         const cachedActivities = await getCachedItems<ActivityFeedItem>('activities');
 
-        if (cachedGroups && cachedGroups.length > 0) setGroups(cachedGroups);
-        if (cachedExpenses && cachedExpenses.length > 0) setAllExpenses(cachedExpenses);
-        if (cachedSettlements && cachedSettlements.length > 0) setAllSettlements(cachedSettlements);
-        if (cachedChat && cachedChat.length > 0) setAllChatMessages(cachedChat);
+        if (cachedGroups && cachedGroups.some((g) => g.id === 'group-bali-retreat')) {
+          await deleteCachedItem('groups', 'group-bali-retreat');
+        }
+
+        const cleanGroups = (cachedGroups || []).filter((g) => g.id !== 'group-bali-retreat');
+        const cleanExpenses = (cachedExpenses || []).filter((e) => e.groupId !== 'group-bali-retreat');
+        const cleanSettlements = (cachedSettlements || []).filter((s) => s.groupId !== 'group-bali-retreat');
+        const cleanChat = (cachedChat || []).filter((c) => c.groupId !== 'group-bali-retreat');
+
+        if (cleanGroups.length > 0) setGroups(cleanGroups);
+        if (cleanExpenses.length > 0) setAllExpenses(cleanExpenses);
+        if (cleanSettlements.length > 0) setAllSettlements(cleanSettlements);
+        if (cleanChat.length > 0) setAllChatMessages(cleanChat);
         if (cachedFriends && cachedFriends.length > 0) setCustomFriends(cachedFriends);
         if (cachedActivities && cachedActivities.length > 0) setActivities(cachedActivities);
       } catch {
