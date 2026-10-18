@@ -20,6 +20,7 @@ import {
   Tag,
   Shield,
   ArrowUpDown,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 export function ExpenseFeed() {
@@ -39,6 +40,7 @@ export function ExpenseFeed() {
     setIsAddExpenseModalOpen,
     setIsSettleModalOpen,
     setIsShareModalOpen,
+    setIsLedgerSettingsModalOpen,
     isViewOnly,
     activeCurrency,
   } = useSplitest();
@@ -154,26 +156,26 @@ export function ExpenseFeed() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC] select-none">
-      <div className="bg-white border-b border-slate-200/80 px-4 sm:px-6 py-4 sticky top-16 z-30">
+    <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC] dark:bg-[#090D16] select-none transition-colors duration-150">
+      <div className="bg-white dark:bg-[#0F172A] border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 py-4 sticky top-16 z-30 transition-colors">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 {activeGroup.name}
               </h1>
               {isViewOnly ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
                   <Shield className="w-3 h-3" />
                   View Only
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#D1FAE5] text-[#065F46] border border-[#A7F3D0]">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#D1FAE5] dark:bg-[#064E3B]/70 text-[#065F46] dark:text-[#A7F3D0] border border-[#A7F3D0] dark:border-[#059669]">
                   {activeGroup.userRole === 'owner' ? 'Owner' : 'Editor'}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">{activeGroup.description || 'Shared Expense Ledger'}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{activeGroup.description || 'Shared Expense Ledger'}</p>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -184,11 +186,11 @@ export function ExpenseFeed() {
                   src={member.avatarUrl}
                   alt={member.name}
                   title={member.name}
-                  className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-2xs"
+                  className="w-8 h-8 rounded-full border-2 border-white dark:border-[#0F172A] object-cover shadow-2xs"
                 />
               ))}
               {activeGroup.members.length > 5 && (
-                <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-2xs">
+                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-[#0F172A] flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300 shadow-2xs">
                   +{activeGroup.members.length - 5}
                 </div>
               )}
@@ -196,8 +198,18 @@ export function ExpenseFeed() {
 
             <button
               type="button"
+              onClick={() => setIsLedgerSettingsModalOpen(true)}
+              className="h-10 px-3.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              title="Ledger Settings"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Settings</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsShareModalOpen(true)}
-              className="h-10 px-3.5 rounded-full bg-[#F1F5F9] hover:bg-slate-200/80 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="h-10 px-3.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span>Share</span>
@@ -208,9 +220,9 @@ export function ExpenseFeed() {
                 <button
                   type="button"
                   onClick={() => setIsSettleModalOpen(true)}
-                  className="h-10 px-4 rounded-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
+                  className="h-10 px-4 rounded-full bg-white dark:bg-[#1E293B] border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
                 >
-                  <Handshake className="w-4 h-4 text-[#059669]" />
+                  <Handshake className="w-4 h-4 text-[#059669] dark:text-[#10B981]" />
                   <span>Settle Up</span>
                 </button>
 
@@ -232,16 +244,16 @@ export function ExpenseFeed() {
         <WalletCardDeck />
 
         <div className="hidden md:grid md:grid-cols-3 gap-3.5">
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Position</span>
+          <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs transition-colors">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Net Position</span>
             <div className="mt-2 flex items-baseline gap-2">
               <span
                 className={`text-2xl sm:text-3xl font-extrabold tabular-nums tracking-tight ${
                   yourBalance > 0
-                    ? 'text-[#059669]'
+                    ? 'text-[#059669] dark:text-[#10B981]'
                     : yourBalance < 0
-                    ? 'text-[#E11D48]'
-                    : 'text-slate-700'
+                    ? 'text-[#E11D48] dark:text-[#F43F5E]'
+                    : 'text-slate-700 dark:text-slate-200'
                 }`}
               >
                 {yourBalance > 0
@@ -251,7 +263,7 @@ export function ExpenseFeed() {
                   : formatCurrency(0, activeCurrency)}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
               {yourBalance > 0
                 ? 'You are owed in total'
                 : yourBalance < 0
@@ -260,24 +272,24 @@ export function ExpenseFeed() {
             </p>
           </div>
 
-          <div className="bg-[#FFE4E6]/60 rounded-3xl p-5 border border-[#FECDD3] shadow-xs">
-            <span className="text-xs font-semibold text-[#9F1239] uppercase tracking-wider">You Owe</span>
+          <div className="bg-[#FFE4E6]/60 dark:bg-[#881337]/30 rounded-3xl p-5 border border-[#FECDD3] dark:border-[#9F1239] shadow-xs transition-colors">
+            <span className="text-xs font-semibold text-[#9F1239] dark:text-[#FECDD3] uppercase tracking-wider">You Owe</span>
             <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-[#9F1239] tabular-nums tracking-tight">
+              <span className="text-2xl sm:text-3xl font-extrabold text-[#9F1239] dark:text-[#FECDD3] tabular-nums tracking-tight">
                 {formatCurrency(totalYouOwe, activeCurrency)}
               </span>
             </div>
-            <p className="text-xs text-[#9F1239]/80 mt-1">Pending payments to members</p>
+            <p className="text-xs text-[#9F1239]/80 dark:text-[#FECDD3]/80 mt-1">Pending payments to members</p>
           </div>
 
-          <div className="bg-[#D1FAE5]/60 rounded-3xl p-5 border border-[#A7F3D0] shadow-xs">
-            <span className="text-xs font-semibold text-[#065F46] uppercase tracking-wider">You Are Owed</span>
+          <div className="bg-[#D1FAE5]/60 dark:bg-[#064E3B]/30 rounded-3xl p-5 border border-[#A7F3D0] dark:border-[#047857] shadow-xs transition-colors">
+            <span className="text-xs font-semibold text-[#065F46] dark:text-[#A7F3D0] uppercase tracking-wider">You Are Owed</span>
             <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-[#065F46] tabular-nums tracking-tight">
+              <span className="text-2xl sm:text-3xl font-extrabold text-[#065F46] dark:text-[#A7F3D0] tabular-nums tracking-tight">
                 {formatCurrency(totalYouAreOwed, activeCurrency)}
               </span>
             </div>
-            <p className="text-xs text-[#065F46]/80 mt-1">Pending reimbursements</p>
+            <p className="text-xs text-[#065F46]/80 dark:text-[#A7F3D0]/80 mt-1">Pending reimbursements</p>
           </div>
         </div>
 
@@ -300,7 +312,7 @@ export function ExpenseFeed() {
                   className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
                     isSelected
                       ? 'bg-[#059669] text-white shadow-2xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      : 'bg-white dark:bg-[#1E293B] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   {chip.label}
@@ -310,17 +322,17 @@ export function ExpenseFeed() {
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-3 py-1 text-xs">
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center gap-1 bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1 text-xs">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as 'latest' | 'highest' | 'lowest')}
                 aria-label="Sort expenses"
-                className="bg-transparent font-semibold text-slate-700 focus:outline-none"
+                className="bg-transparent font-semibold text-slate-700 dark:text-slate-200 focus:outline-none"
               >
-                <option value="latest">Latest first</option>
-                <option value="highest">Highest amount</option>
-                <option value="lowest">Lowest amount</option>
+                <option value="latest" className="dark:bg-[#1E293B] dark:text-slate-100">Latest first</option>
+                <option value="highest" className="dark:bg-[#1E293B] dark:text-slate-100">Highest amount</option>
+                <option value="lowest" className="dark:bg-[#1E293B] dark:text-slate-100">Lowest amount</option>
               </select>
             </div>
 
@@ -329,8 +341,8 @@ export function ExpenseFeed() {
               onClick={() => setSimplifyDebts(!simplifyDebts)}
               className={`px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
                 simplifyDebts
-                  ? 'bg-[#D1FAE5] text-[#065F46] border-[#A7F3D0]'
-                  : 'bg-white text-slate-600 border-slate-200'
+                  ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70 text-[#065F46] dark:text-[#A7F3D0] border-[#A7F3D0] dark:border-[#059669]'
+                  : 'bg-white dark:bg-[#1E293B] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
               }`}
             >
               Simplify Debts: {simplifyDebts ? 'On' : 'Off'}
@@ -340,19 +352,19 @@ export function ExpenseFeed() {
 
         <div className="space-y-6">
           {Object.keys(groupedByMonth).length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80">
-              <Receipt className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-slate-800">No expenses recorded</h3>
-              <p className="text-xs text-slate-400 mt-1">Expenses added to this ledger will appear here.</p>
+            <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-12 text-center border border-slate-200/80 dark:border-slate-800 transition-colors">
+              <Receipt className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">No expenses recorded</h3>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Expenses added to this ledger will appear here.</p>
             </div>
           ) : (
             Object.entries(groupedByMonth).map(([month, monthExpenses]) => (
               <div key={month} className="space-y-2">
                 <div className="px-2">
-                  <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{month}</h2>
+                  <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{month}</h2>
                 </div>
 
-                <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden divide-y divide-slate-100 shadow-2xs">
+                <div className="bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-2xs transition-colors">
                   {monthExpenses.map((expense) => {
                     const isSelected = selectedExpenseId === expense.id;
                     const IconComponent = getCategoryIcon(expense.category);
@@ -364,25 +376,25 @@ export function ExpenseFeed() {
                         key={expense.id}
                         onClick={() => setSelectedExpenseId(expense.id)}
                         className={`p-4 flex items-center justify-between gap-4 cursor-pointer transition-colors ${
-                          isSelected ? 'bg-slate-50/90' : 'hover:bg-slate-50/50'
+                          isSelected ? 'bg-slate-50/90 dark:bg-slate-800/80' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/40'
                         }`}
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="w-11 h-11 rounded-2xl bg-[#F1F5F9] text-slate-700 flex items-center justify-center shrink-0 border border-slate-200/60">
+                          <div className="w-11 h-11 rounded-2xl bg-[#F1F5F9] dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0 border border-slate-200/60 dark:border-slate-700">
                             <IconComponent className="w-5 h-5" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <h3 className="text-sm font-bold text-slate-900 truncate">
+                              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
                                 {expense.description}
                               </h3>
                               {expense.hasReceipt && (
-                                <Receipt className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <Receipt className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                               )}
                             </div>
-                            <p className="text-xs text-slate-500 mt-0.5">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                               {isPayerYou ? 'You paid' : `${expense.paidByName} paid`}{' '}
-                              <strong className="text-slate-700">{formatCurrency(expense.amount, expense.currencyCode || activeCurrency)}</strong>
+                              <strong className="text-slate-700 dark:text-slate-200">{formatCurrency(expense.amount, expense.currencyCode || activeCurrency)}</strong>
                               {' • '}
                               <LocalTime isoString={expense.date} format="short" />
                             </p>
@@ -392,20 +404,20 @@ export function ExpenseFeed() {
                         <div className="text-right shrink-0">
                           {isPayerYou ? (
                             <div>
-                              <span className="text-[11px] font-semibold text-[#059669] block">you lent</span>
-                              <span className="text-sm font-bold text-[#059669] tabular-nums">
+                              <span className="text-[11px] font-semibold text-[#059669] dark:text-[#10B981] block">you lent</span>
+                              <span className="text-sm font-bold text-[#059669] dark:text-[#10B981] tabular-nums">
                                 +{formatCurrency(expense.amount - (yourSplit?.shareAmount || 0), activeCurrency)}
                               </span>
                             </div>
                           ) : yourSplit && yourSplit.shareAmount > 0 ? (
                             <div>
-                              <span className="text-[11px] font-semibold text-[#E11D48] block">you borrowed</span>
-                              <span className="text-sm font-bold text-[#E11D48] tabular-nums">
+                              <span className="text-[11px] font-semibold text-[#E11D48] dark:text-[#F43F5E] block">you borrowed</span>
+                              <span className="text-sm font-bold text-[#E11D48] dark:text-[#F43F5E] tabular-nums">
                                 -{formatCurrency(yourSplit.shareAmount, activeCurrency)}
                               </span>
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-400 font-medium">not involved</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">not involved</span>
                           )}
                         </div>
                       </div>

@@ -36,9 +36,11 @@ export function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const toggleNextTheme = () => {
-    if (theme === "light") setTheme("dark");
-    else if (theme === "dark") setTheme("system");
-    else setTheme("light");
+    const isCurrentlyDark =
+      typeof document !== "undefined"
+        ? document.documentElement.classList.contains("dark")
+        : theme === "dark";
+    setTheme(isCurrentlyDark ? "light" : "dark");
   };
 
   return (

@@ -90,7 +90,7 @@ function LoginForm() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center items-center px-4 py-12 select-none">
+    <main className="min-h-screen bg-[#F8FAFC] dark:bg-[#090D16] flex flex-col justify-center items-center px-4 py-12 select-none">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <img
@@ -98,20 +98,20 @@ function LoginForm() {
             alt="Splitest"
             className="w-16 h-16 object-contain mb-4 shadow-sm"
           />
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Splitest
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Shared expense and debt resolution
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-8 shadow-sm">
+        <div className="bg-white dark:bg-[#0F172A] rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8 shadow-sm">
           <button
             type="button"
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full h-12 rounded-full border border-slate-300 bg-white hover:bg-slate-50 active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-sm font-semibold text-slate-700 shadow-sm"
+            className="w-full h-12 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -135,16 +135,16 @@ function LoginForm() {
           </button>
 
           <div className="flex items-center my-6 gap-3">
-            <div className="h-px bg-slate-200 flex-1" />
-            <span className="text-xs uppercase font-medium text-slate-400 tracking-wider">
+            <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1" />
+            <span className="text-xs uppercase font-medium text-slate-400 dark:text-slate-500 tracking-wider">
               or email
             </span>
-            <div className="h-px bg-slate-200 flex-1" />
+            <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1" />
           </div>
 
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Email address
               </label>
               <div className="relative">
@@ -154,15 +154,15 @@ function LoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
                   required
-                  className="w-full h-11 px-4 pl-10 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#059669] focus:ring-1 focus:ring-[#059669]"
+                  className="w-full h-11 px-4 pl-10 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981] focus:ring-1 focus:ring-[#059669]"
                 />
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-3.5" />
               </div>
             </div>
 
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Password (optional for magic link)
                 </label>
               </div>
@@ -172,14 +172,14 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Leave empty for magic link"
-                  className="w-full h-11 px-4 pl-10 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#059669] focus:ring-1 focus:ring-[#059669]"
+                  className="w-full h-11 px-4 pl-10 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981] focus:ring-1 focus:ring-[#059669]"
                 />
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <Lock className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-3.5" />
               </div>
             </div>
 
             {errorMsg && (
-              <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-xl">
+              <p className="text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 p-2.5 rounded-xl">
                 {errorMsg}
               </p>
             )}
@@ -194,13 +194,13 @@ function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-slate-100 flex flex-col gap-2.5">
+          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
             <button
               type="button"
               onClick={establishSession}
-              className="w-full h-10 rounded-full bg-[#F1F5F9] hover:bg-slate-200/80 text-xs font-semibold text-slate-700 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              className="w-full h-10 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] hover:bg-slate-200/80 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             >
-              <ShieldCheck className="w-4 h-4 text-[#059669]" />
+              <ShieldCheck className="w-4 h-4 text-[#059669] dark:text-[#34D399]" />
               Quick Preview (Demo Session)
             </button>
           </div>
@@ -212,7 +212,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] dark:bg-[#090D16]" />}>
       <LoginForm />
     </Suspense>
   );

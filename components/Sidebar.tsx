@@ -15,7 +15,10 @@ import {
   ChevronDown,
   ChevronRight,
   Shield,
-  Settings,
+  Sun,
+  Moon,
+  Database,
+  CloudCheck,
 } from "lucide-react";
 
 export function Sidebar() {
@@ -31,6 +34,12 @@ export function Sidebar() {
     allSettlements,
     isViewOnly,
     activeCurrency,
+    theme,
+    setTheme,
+    supabaseStatus,
+    pendingSyncCount,
+    isOffline,
+    syncNow,
   } = useSplitest();
 
   const [isGroupsOpen, setIsGroupsOpen] = useState(true);
@@ -60,7 +69,6 @@ export function Sidebar() {
     { id: "chat", label: "Chat", icon: MessageSquare },
     { id: "analytics", label: "Insights", icon: PieChart },
     { id: "profile", label: "Profile", icon: User },
-    { id: "settings", label: "Settings", icon: Settings },
   ] as const;
 
   return (
@@ -175,15 +183,76 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="p-3 lg:p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center lg:justify-between text-xs text-slate-500 dark:text-slate-400">
-        <div className="hidden lg:flex items-center gap-2">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            Splitest
+      <div className="p-2 lg:p-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-1.5">
+        <button
+          type="button"
+          onClick={() => void syncNow()}
+          className="w-full h-8 px-2 lg:px-3 rounded-xl flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
+          title="Click to sync data with database"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                isOffline
+                  ? "bg-amber-500"
+                  : supabaseStatus === "connected"
+                  ? "bg-emerald-500"
+                  : supabaseStatus === "connecting"
+                  ? "bg-sky-500 animate-ping"
+                  : "bg-slate-400"
+              }`}
+            />
+            <span className="hidden lg:inline truncate">
+              {isOffline
+                ? "Offline Cache"
+                : supabaseStatus === "connected"
+                ? "Database Synced"
+                : supabaseStatus === "connecting"
+                ? "Connecting..."
+                : "Local Mode"}
+            </span>
+          </div>
+          {pendingSyncCount > 0 ? (
+            <span className="px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold">
+              {pendingSyncCount} queued
+            </span>
+          ) : (
+            <Database className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 hidden lg:inline shrink-0" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            const isCurrentlyDark =
+              typeof document !== "undefined"
+                ? document.documentElement.classList.contains("dark")
+                : theme === "dark";
+            setTheme(isCurrentlyDark ? "light" : "dark");
+          }}
+          className="w-full h-10 px-2 lg:px-3 rounded-2xl flex items-center justify-center lg:justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          aria-label="Toggle theme appearance"
+        >
+          <div className="flex items-center gap-2.5">
+            {theme === "dark" ? (
+              <Moon className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+            )}
+            <span className="hidden lg:inline">
+              {theme === "dark" ? "Dark Theme" : "Light Theme"}
+            </span>
+          </div>
+          <span className="hidden lg:inline text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+            {theme}
           </span>
+        </button>
+
+        <div className="hidden lg:flex items-center justify-between px-1 text-[11px] text-slate-400 dark:text-slate-500">
+          <span>Splitest</span>
+          <span className="font-mono text-[10px]">v1.0.0</span>
         </div>
-        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 tracking-wider">
-          v1.2
-        </span>
       </div>
     </aside>
   );

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useSplitest } from "@/lib/store";
-import { SUPPORTED_CURRENCIES } from "@/lib/currency";
+import { buildProfileShareUrl } from "@/lib/users-directory";
 import {
   User,
   Mail,
@@ -13,10 +13,14 @@ import {
   CheckCircle2,
   Save,
   Send,
-  Banknote,
   Sun,
   Moon,
   Monitor,
+  Share2,
+  Copy,
+  Check,
+  ExternalLink,
+  AtSign,
 } from "lucide-react";
 
 const PRESET_AVATARS = [
@@ -35,14 +39,14 @@ export function ProfileView() {
     syncGoogleAccount,
     disconnectGoogleAccount,
     sendTestNotification,
-    activeCurrency,
-    setActiveCurrency,
     showToast,
     theme,
     setTheme,
+    setIsShareProfileModalOpen,
   } = useSplitest();
 
   const [fullName, setFullName] = useState(userProfile.fullName);
+  const [username, setUsername] = useState(userProfile.username || userProfile.paymentHandle || "you.splitest");
   const [email, setEmail] = useState(userProfile.email);
   const [phone, setPhone] = useState(userProfile.phone || "");
   const [paymentHandle, setPaymentHandle] = useState(
@@ -50,6 +54,7 @@ export function ProfileView() {
   );
   const [avatarUrl, setAvatarUrl] = useState(userProfile.avatarUrl);
   const [customAvatarInput, setCustomAvatarInput] = useState("");
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const [notifyOnExpense, setNotifyOnExpense] = useState(
     userProfile.notifyOnExpense,
@@ -66,15 +71,28 @@ export function ProfileView() {
 
   const [isSendingTest, setIsSendingTest] = useState(false);
 
+  const currentProfileUrl = buildProfileShareUrl(username || "you.splitest");
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(currentProfileUrl);
+      setCopiedLink(true);
+      showToast("Profile link copied to clipboard");
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      showToast("Could not copy link to clipboard");
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     updateUserProfile({
       fullName,
+      username: username.trim().toLowerCase(),
       email,
       phone,
       paymentHandle,
       avatarUrl: customAvatarInput.trim() || avatarUrl,
-      defaultCurrency: activeCurrency,
       themePreference: theme,
       notifyOnExpense,
       notifyOnSettlement,
@@ -205,6 +223,25 @@ export function ProfileView() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <AtSign className="w-3.5 h-3.5 text-slate-400" />
+                Username
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-xs font-mono text-slate-400 pointer-events-none">
+                  @
+                </span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                  placeholder="your.username"
+                  className="w-full h-11 pl-8 pr-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-semibold font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-slate-400" />
                 Phone Number
               </label>
@@ -217,7 +254,7 @@ export function ProfileView() {
               />
             </div>
 
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                 Settlement Payment Handle
@@ -229,6 +266,74 @@ export function ProfileView() {
                 placeholder="e.g., yourname.splitest"
                 className="w-full h-11 px-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669]"
               />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 transition-colors">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <Share2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  Profile Sharing & Friends Link
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Share your personal link so friends can find and add you directly
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsShareProfileModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Share Link
+            </button>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="text-[11px] font-mono font-medium text-slate-500 dark:text-slate-400 block mb-0.5">
+                Canonical Profile Link
+              </span>
+              <span className="text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 select-all block truncate">
+                {currentProfileUrl}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:border-primary text-slate-800 dark:text-slate-200 text-xs font-semibold transition-colors bg-white dark:bg-slate-800"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-slate-500" />
+                    Copy
+                  </>
+                )}
+              </button>
+
+              <a
+                href={`/u/${username || 'you.splitest'}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:border-primary text-slate-800 dark:text-slate-200 text-xs font-semibold transition-colors bg-white dark:bg-slate-800"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                Preview Card
+              </a>
             </div>
           </div>
         </div>
@@ -493,47 +598,6 @@ export function ProfileView() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 transition-colors">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#D1FAE5] dark:bg-[#064E3B]/60 text-[#065F46] dark:text-[#A7F3D0] flex items-center justify-center">
-              <Banknote className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                Default Currency Preference
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Your base currency for calculating personal balances
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
-            {SUPPORTED_CURRENCIES.map((curr) => {
-              const isSelected = activeCurrency === curr.code;
-              return (
-                <button
-                  key={curr.code}
-                  type="button"
-                  onClick={() => {
-                    setActiveCurrency(curr.code);
-                    showToast(`Default currency set to ${curr.code}`);
-                  }}
-                  className={`p-3 rounded-2xl border text-left transition-all ${
-                    isSelected
-                      ? "border-[#059669] dark:border-[#10B981] bg-[#D1FAE5]/30 dark:bg-[#064E3B]/40 text-[#065F46] dark:text-[#A7F3D0] ring-1 ring-[#059669]"
-                      : "border-slate-200/80 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                  }`}
-                >
-                  <div className="text-xs font-bold">{curr.code}</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                    {curr.name}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         <div className="flex justify-end gap-3 pt-2">
           <button

@@ -1,329 +1,161 @@
 create extension if not exists "uuid-ossp";
 
 create table if not exists profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id text primary key,
   email text not null,
   full_name text not null,
+  username text,
   avatar_url text,
   default_currency varchar(3) not null default 'USD',
+  phone text,
+  payment_handle text,
+  upi_id text,
+  bio text,
+  theme_preference text not null default 'system',
+  google_connected boolean not null default false,
+  google_email text,
+  notifications_enabled boolean not null default true,
+  notify_on_expense boolean not null default true,
+  notify_on_settlement boolean not null default true,
+  notify_on_mention boolean not null default true,
+  notify_weekly_digest boolean not null default false,
   created_at timestamptz not null default now()
 );
 
 create table if not exists groups (
-  id bigint generated always as identity primary key,
+  id text primary key,
   name text not null,
-  icon_emoji text not null default 'wallet',
+  icon text not null default 'Users',
+  category text not null default 'Trip',
+  description text,
   default_currency varchar(3) not null default 'USD',
   simplify_debts boolean not null default true,
-  created_by uuid references profiles(id) on delete set null,
+  user_role text not null default 'owner',
+  created_by text,
   created_at timestamptz not null default now()
 );
 
 create table if not exists group_members (
-  id bigint generated always as identity primary key,
-  group_id bigint not null references groups(id) on delete cascade,
-  user_id uuid not null references profiles(id) on delete cascade,
-  role text not null check (role in ('owner', 'editor', 'viewer')) default 'editor',
-  joined_at timestamptz not null default now(),
-  constraint group_members_group_user_unique unique (group_id, user_id)
-);
-
-create table if not exists group_invitations (
-  id bigint generated always as identity primary key,
-  group_id bigint not null references groups(id) on delete cascade,
-  invited_by uuid not null references profiles(id) on delete cascade,
-  invitee_email text,
-  token text not null unique,
-  role text not null check (role in ('editor', 'viewer')) default 'editor',
-  status text not null check (status in ('pending', 'accepted', 'revoked')) default 'pending',
-  expires_at timestamptz not null default (now() + interval '7 days'),
-  created_at timestamptz not null default now()
+  id text primary key,
+  group_id text not null references groups(id) on delete cascade,
+  name text not null,
+  email text,
+  avatar_url text,
+  role text not null default 'editor',
+  is_current_user boolean not null default false,
+  joined_at timestamptz not null default now()
 );
 
 create table if not exists expenses (
-  id bigint generated always as identity primary key,
-  group_id bigint references groups(id) on delete set null,
+  id text primary key,
+  group_id text references groups(id) on delete cascade,
   description text not null,
-  category text not null default 'General',
+  category text not null default 'general',
   amount numeric(12,2) not null check (amount > 0),
   currency_code varchar(3) not null default 'USD',
   exchange_rate_to_group numeric(12,6) not null default 1.0,
-  paid_by uuid not null references profiles(id),
-  split_type text not null check (split_type in ('equal', 'exact', 'percent', 'shares')) default 'equal',
-  expense_date timestamptz not null default now(),
-  created_by uuid not null references profiles(id),
-  updated_at timestamptz not null default now()
+  paid_by_name text not null,
+  split_method text not null default 'equal',
+  date text not null,
+  has_receipt boolean not null default false,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists expense_splits (
-  id bigint generated always as identity primary key,
-  expense_id bigint not null references expenses(id) on delete cascade,
-  user_id uuid not null references profiles(id) on delete cascade,
-  amount_owed numeric(12,2) not null default 0,
-  share_value numeric(10,2) not null default 1.0
+  id text primary key,
+  expense_id text not null references expenses(id) on delete cascade,
+  member_name text not null,
+  share_amount numeric(12,2) not null default 0,
+  percentage numeric(10,2),
+  shares numeric(10,2)
+);
+
+create table if not exists comments (
+  id text primary key,
+  expense_id text not null references expenses(id) on delete cascade,
+  author_name text not null,
+  content text not null,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists settlements (
-  id bigint generated always as identity primary key,
-  group_id bigint not null references groups(id) on delete cascade,
-  from_user_id uuid not null references profiles(id),
-  to_user_id uuid not null references profiles(id),
+  id text primary key,
+  group_id text not null references groups(id) on delete cascade,
+  payer_name text not null,
+  recipient_name text not null,
   amount numeric(12,2) not null check (amount > 0),
   currency_code varchar(3) not null default 'USD',
-  settled_at timestamptz not null default now()
+  method text not null default 'Manual',
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists chat_messages (
+  id text primary key,
+  group_id text not null references groups(id) on delete cascade,
+  sender_name text not null,
+  sender_avatar_url text,
+  sender_is_current_user boolean not null default false,
+  content text not null,
+  mentions jsonb not null default '[]'::jsonb,
+  attachment jsonb,
+  likes jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists friends (
+  id text primary key,
+  name text not null,
+  username text,
+  email text,
+  avatar_url text,
+  phone text,
+  net_balance numeric(12,2) default 0,
+  group_count integer default 0,
+  added_via text default 'directory',
+  created_at timestamptz not null default now()
 );
 
 create table if not exists activity_logs (
-  id bigint generated always as identity primary key,
-  group_id bigint not null references groups(id) on delete cascade,
-  user_id uuid references profiles(id) on delete set null,
-  action_type text not null,
-  details jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
+  id text primary key,
+  group_id text references groups(id) on delete cascade,
+  type text not null,
+  title text not null,
+  subtitle text,
+  timestamp timestamptz not null default now(),
+  icon_name text,
+  icon_color_class text
 );
 
 alter table profiles enable row level security;
 alter table groups enable row level security;
 alter table group_members enable row level security;
-alter table group_invitations enable row level security;
 alter table expenses enable row level security;
 alter table expense_splits enable row level security;
+alter table comments enable row level security;
 alter table settlements enable row level security;
+alter table chat_messages enable row level security;
+alter table friends enable row level security;
 alter table activity_logs enable row level security;
 
-create policy "Profiles visible to authenticated users"
-  on profiles for select
-  to authenticated
-  using (true);
+create policy "Allow all access to profiles" on profiles for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to groups" on groups for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to group_members" on group_members for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to expenses" on expenses for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to expense_splits" on expense_splits for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to comments" on comments for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to settlements" on settlements for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to chat_messages" on chat_messages for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to friends" on friends for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to activity_logs" on activity_logs for all to anon, authenticated using (true) with check (true);
 
-create policy "Users can update own profile"
-  on profiles for update
-  to authenticated
-  using (auth.uid() = id);
-
-create policy "Members can view their groups"
-  on groups for select
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = groups.id
-      and group_members.user_id = auth.uid()
-    )
-    or created_by = auth.uid()
-  );
-
-create policy "Authenticated users can create groups"
-  on groups for insert
-  to authenticated
-  with check (auth.uid() = created_by);
-
-create policy "Owners and editors can update group details"
-  on groups for update
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = groups.id
-      and group_members.user_id = auth.uid()
-      and group_members.role in ('owner', 'editor')
-    )
-  );
-
-create policy "Only owners can delete group"
-  on groups for delete
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = groups.id
-      and group_members.user_id = auth.uid()
-      and group_members.role = 'owner'
-    )
-    or created_by = auth.uid()
-  );
-
-create policy "Members can view group members"
-  on group_members for select
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members as gm
-      where gm.group_id = group_members.group_id
-      and gm.user_id = auth.uid()
-    )
-  );
-
-create policy "Owners can manage group members"
-  on group_members for all
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members as gm
-      where gm.group_id = group_members.group_id
-      and gm.user_id = auth.uid()
-      and gm.role = 'owner'
-    )
-    or group_members.user_id = auth.uid()
-  );
-
-create policy "Members can view group invitations"
-  on group_invitations for select
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = group_invitations.group_id
-      and group_members.user_id = auth.uid()
-    )
-  );
-
-create policy "Owners and editors can create invitations"
-  on group_invitations for insert
-  to authenticated
-  with check (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = group_invitations.group_id
-      and group_members.user_id = auth.uid()
-      and group_members.role in ('owner', 'editor')
-    )
-  );
-
-create policy "Owners can update invitations"
-  on group_invitations for update
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = group_invitations.group_id
-      and group_members.user_id = auth.uid()
-      and group_members.role = 'owner'
-    )
-  );
-
-create policy "Members can view expenses"
-  on expenses for select
-  to authenticated
-  using (
-    group_id is null
-    or exists (
-      select 1 from group_members
-      where group_members.group_id = expenses.group_id
-      and group_members.user_id = auth.uid()
-    )
-  );
-
-create policy "Owners and editors can insert expenses"
-  on expenses for insert
-  to authenticated
-  with check (
-    group_id is null
-    or exists (
-      select 1 from group_members
-      where group_members.group_id = expenses.group_id
-      and group_members.user_id = auth.uid()
-      and group_members.role in ('owner', 'editor')
-    )
-  );
-
-create policy "Owners and editors can update expenses"
-  on expenses for update
-  to authenticated
-  using (
-    group_id is null
-    or exists (
-      select 1 from group_members
-      where group_members.group_id = expenses.group_id
-      and group_members.user_id = auth.uid()
-      and group_members.role in ('owner', 'editor')
-    )
-  );
-
-create policy "Owners and editors can delete expenses"
-  on expenses for delete
-  to authenticated
-  using (
-    group_id is null
-    or exists (
-      select 1 from group_members
-      where group_members.group_id = expenses.group_id
-      and group_members.user_id = auth.uid()
-      and group_members.role in ('owner', 'editor')
-    )
-  );
-
-create policy "Members can view splits"
-  on expense_splits for select
-  to authenticated
-  using (
-    exists (
-      select 1 from expenses
-      left join group_members on group_members.group_id = expenses.group_id
-      where expenses.id = expense_splits.expense_id
-      and (expenses.group_id is null or group_members.user_id = auth.uid())
-    )
-  );
-
-create policy "Owners and editors can manage splits"
-  on expense_splits for all
-  to authenticated
-  using (
-    exists (
-      select 1 from expenses
-      left join group_members on group_members.group_id = expenses.group_id
-      where expenses.id = expense_splits.expense_id
-      and (expenses.group_id is null or (group_members.user_id = auth.uid() and group_members.role in ('owner', 'editor')))
-    )
-  );
-
-create policy "Members can view settlements"
-  on settlements for select
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = settlements.group_id
-      and group_members.user_id = auth.uid()
-    )
-  );
-
-create policy "Owners and editors can insert settlements"
-  on settlements for insert
-  to authenticated
-  with check (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = settlements.group_id
-      and group_members.user_id = auth.uid()
-      and group_members.role in ('owner', 'editor')
-    )
-  );
-
-create policy "Members can view activity logs"
-  on activity_logs for select
-  to authenticated
-  using (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = activity_logs.group_id
-      and group_members.user_id = auth.uid()
-    )
-  );
-
-create policy "Members can insert activity logs"
-  on activity_logs for insert
-  to authenticated
-  with check (
-    exists (
-      select 1 from group_members
-      where group_members.group_id = activity_logs.group_id
-      and group_members.user_id = auth.uid()
-    )
-  );
-
+alter publication supabase_realtime add table profiles;
 alter publication supabase_realtime add table groups;
 alter publication supabase_realtime add table group_members;
 alter publication supabase_realtime add table expenses;
 alter publication supabase_realtime add table expense_splits;
+alter publication supabase_realtime add table comments;
 alter publication supabase_realtime add table settlements;
+alter publication supabase_realtime add table chat_messages;
+alter publication supabase_realtime add table friends;
+alter publication supabase_realtime add table activity_logs;

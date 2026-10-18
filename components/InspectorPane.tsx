@@ -15,6 +15,7 @@ import {
   Send,
   Receipt,
   MessageSquare,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 export function InspectorPane() {
@@ -33,6 +34,7 @@ export function InspectorPane() {
     showToast,
     isViewOnly,
     activeCurrency,
+    setIsLedgerSettingsModalOpen,
   } = useSplitest();
 
   const [commentText, setCommentText] = useState('');
@@ -96,8 +98,34 @@ export function InspectorPane() {
   }, [categoryBreakdown, circumference]);
 
   return (
-    <aside className="w-[340px] shrink-0 bg-white border-l border-slate-200/80 p-5 flex flex-col gap-5 overflow-y-auto thin-scrollbar hidden xl:flex select-none">
-      <div className="flex items-center bg-[#F1F5F9] p-1 rounded-full border border-slate-200/60">
+    <aside className="w-[340px] shrink-0 bg-white dark:bg-[#0F172A] border-l border-slate-200/80 dark:border-slate-800 p-5 flex flex-col gap-4 overflow-y-auto thin-scrollbar hidden xl:flex select-none">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-2xl bg-[#D1FAE5] dark:bg-[#064E3B]/60 text-[#065F46] dark:text-[#A7F3D0] flex items-center justify-center font-bold text-xs shrink-0">
+            {activeGroup.name.slice(0, 1)}
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+              {activeGroup.name}
+            </h3>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+              Currency: {activeCurrency}
+            </span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsLedgerSettingsModalOpen(true)}
+          className="h-7 px-2.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-semibold flex items-center gap-1 transition-colors"
+          title="Ledger Settings"
+        >
+          <SlidersHorizontal className="w-3 h-3" />
+          <span>Settings</span>
+        </button>
+      </div>
+
+      <div className="flex items-center bg-[#F1F5F9] dark:bg-[#1E293B] p-1 rounded-full border border-slate-200/60 dark:border-slate-800">
         {(['balances', 'spending', 'activity'] as const).map((tab) => {
           const isActive = activeInspectorTab === tab;
           return (
@@ -107,8 +135,8 @@ export function InspectorPane() {
               onClick={() => setActiveInspectorTab(tab)}
               className={`flex-1 py-1.5 rounded-full text-xs font-semibold transition-all capitalize ${
                 isActive
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                  : 'text-slate-500 hover:text-slate-900'
+                  ? 'bg-white dark:bg-[#0F172A] text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
               }`}
             >
               {tab}
@@ -121,17 +149,17 @@ export function InspectorPane() {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                 {simplifyDebts ? 'Debt Flow (Simplified)' : 'Direct Debts'}
               </span>
-              <span className="text-[11px] text-[#065F46] font-semibold bg-[#D1FAE5] px-2.5 py-0.5 rounded-full">
+              <span className="text-[11px] text-[#065F46] dark:text-[#A7F3D0] font-semibold bg-[#D1FAE5] dark:bg-[#064E3B]/50 px-2.5 py-0.5 rounded-full">
                 {debts.length} {debts.length === 1 ? 'payment' : 'payments'}
               </span>
             </div>
 
             <div className="flex flex-col gap-2">
               {debts.length === 0 ? (
-                <div className="p-4 rounded-2xl bg-[#F8FAFC] text-center text-xs text-slate-400 border border-slate-200/60">
+                <div className="p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B]/50 text-center text-xs text-slate-400 dark:text-slate-500 border border-slate-200/60 dark:border-slate-800">
                   All debts in this ledger are settled.
                 </div>
               ) : (
@@ -142,20 +170,20 @@ export function InspectorPane() {
                   return (
                     <div
                       key={`${item.debtor}-${item.creditor}-${index}`}
-                      className="p-3.5 rounded-2xl bg-[#F8FAFC] flex items-center justify-between gap-2.5 border border-slate-200/80 shadow-2xs"
+                      className="p-3.5 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B]/60 flex items-center justify-between gap-2.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span
                           className={`text-xs font-semibold truncate ${
-                            isYouDebtor ? 'text-[#E11D48]' : 'text-slate-800'
+                            isYouDebtor ? 'text-[#E11D48] dark:text-[#FB7185]' : 'text-slate-800 dark:text-slate-200'
                           }`}
                         >
                           {item.debtor}
                         </span>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                         <span
                           className={`text-xs font-semibold truncate ${
-                            isYouCreditor ? 'text-[#059669]' : 'text-slate-800'
+                            isYouCreditor ? 'text-[#059669] dark:text-[#34D399]' : 'text-slate-800 dark:text-slate-200'
                           }`}
                         >
                           {item.creditor}
@@ -163,7 +191,7 @@ export function InspectorPane() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs font-bold text-slate-900 tabular-nums">
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                           {formatCurrency(item.amount, activeCurrency)}
                         </span>
 
@@ -182,7 +210,7 @@ export function InspectorPane() {
                               <button
                                 type="button"
                                 onClick={() => handleRemindDebt(item.debtor, item.amount)}
-                                className="px-2.5 py-1 rounded-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-all"
+                                className="px-2.5 py-1 rounded-full bg-white dark:bg-[#1E293B] border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-[11px] font-semibold transition-all"
                               >
                                 Remind
                               </button>
@@ -197,8 +225,8 @@ export function InspectorPane() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+          <div className="flex flex-col gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
               Member Ledger ({activeGroup.members.length})
             </span>
             <div className="space-y-1.5">
@@ -207,15 +235,15 @@ export function InspectorPane() {
                 return (
                   <div
                     key={member.id}
-                    className="p-2.5 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-between gap-3 shadow-2xs"
+                    className="p-2.5 rounded-2xl bg-white dark:bg-[#1E293B] border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3 shadow-2xs"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img
                         src={member.avatarUrl}
                         alt={member.name}
-                        className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                        className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
                       />
-                      <span className="text-xs font-semibold text-slate-800 truncate">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
                         {member.name}
                       </span>
                     </div>
@@ -223,10 +251,10 @@ export function InspectorPane() {
                     <span
                       className={`text-xs font-bold tabular-nums shrink-0 ${
                         balance > 0
-                          ? 'text-[#059669]'
+                          ? 'text-[#059669] dark:text-[#34D399]'
                           : balance < 0
-                          ? 'text-[#E11D48]'
-                          : 'text-slate-400'
+                          ? 'text-[#E11D48] dark:text-[#FB7185]'
+                          : 'text-slate-400 dark:text-slate-500'
                       }`}
                     >
                       {balance > 0
@@ -245,7 +273,7 @@ export function InspectorPane() {
 
       {activeInspectorTab === 'spending' && (
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col items-center p-4 bg-[#F8FAFC] rounded-3xl border border-slate-200/80">
+          <div className="flex flex-col items-center p-4 bg-[#F8FAFC] dark:bg-[#1E293B]/60 rounded-3xl border border-slate-200/80 dark:border-slate-800">
             <div className="relative w-36 h-36 flex items-center justify-center">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                 <circle
@@ -253,7 +281,8 @@ export function InspectorPane() {
                   cy="50"
                   r="38"
                   fill="transparent"
-                  stroke="#E2E8F0"
+                  stroke="currentColor"
+                  className="text-slate-200 dark:text-slate-800"
                   strokeWidth="10"
                 />
                 {donutSegments.map((segment, index) => (
@@ -273,40 +302,40 @@ export function InspectorPane() {
                 ))}
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-base font-extrabold text-slate-900 tabular-nums">
+                <span className="text-base font-extrabold text-slate-900 dark:text-slate-100 tabular-nums">
                   {formatCurrency(totalGroupSpending, activeCurrency)}
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">Total Spent</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Total Spent</span>
               </div>
             </div>
 
             <div className="mt-3 text-center">
-              <span className="text-xs text-slate-500">
-                Average per person: <strong>{formatCurrency(averagePerPerson, activeCurrency)}</strong>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Average per person: <strong className="text-slate-800 dark:text-slate-200">{formatCurrency(averagePerPerson, activeCurrency)}</strong>
               </span>
             </div>
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
               Category Breakdown
             </span>
             <div className="space-y-1.5">
               {categoryBreakdown.map((item) => (
                 <div
                   key={item.category}
-                  className="p-2.5 rounded-2xl bg-[#F8FAFC] border border-slate-200/60 flex items-center justify-between text-xs"
+                  className="p-2.5 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B]/60 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs"
                 >
                   <div className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded-full shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="font-semibold text-slate-800 capitalize">{item.category}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 capitalize">{item.category}</span>
                   </div>
                   <div className="flex items-center gap-2 tabular-nums">
-                    <span className="text-slate-500">{item.percentage}%</span>
-                    <span className="font-bold text-slate-900">
+                    <span className="text-slate-500 dark:text-slate-400">{item.percentage}%</span>
+                    <span className="font-bold text-slate-900 dark:text-slate-100">
                       {formatCurrency(item.total, activeCurrency)}
                     </span>
                   </div>
@@ -319,21 +348,21 @@ export function InspectorPane() {
 
       {activeInspectorTab === 'activity' && (
         <div className="space-y-3">
-          <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
             Recent Activity
           </span>
           <div className="space-y-2">
             {activities.map((act) => (
               <div
                 key={act.id}
-                className="p-3 rounded-2xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3 shadow-2xs"
+                className="p-3 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B]/60 border border-slate-200/80 dark:border-slate-800 flex items-start gap-3 shadow-2xs"
               >
-                <div className="w-8 h-8 rounded-xl bg-[#D1FAE5] text-[#065F46] flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-8 h-8 rounded-xl bg-[#D1FAE5] dark:bg-[#064E3B]/50 text-[#065F46] dark:text-[#A7F3D0] flex items-center justify-center shrink-0 mt-0.5">
                   <Receipt className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-900 leading-snug">{act.title}</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{act.subtitle}</p>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">{act.title}</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{act.subtitle}</p>
                 </div>
               </div>
             ))}
@@ -342,24 +371,24 @@ export function InspectorPane() {
       )}
 
       {selectedExpense && (
-        <div className="mt-auto pt-4 border-t border-slate-100 flex flex-col gap-3">
-          <div className="p-4 rounded-3xl bg-[#F8FAFC] border border-slate-200/80 space-y-3">
+        <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-3">
+          <div className="p-4 rounded-3xl bg-[#F8FAFC] dark:bg-[#1E293B]/60 border border-slate-200/80 dark:border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
-                <Receipt className="w-4 h-4 text-[#059669] shrink-0" />
-                <h4 className="text-xs font-bold text-slate-900 truncate">
+                <Receipt className="w-4 h-4 text-[#059669] dark:text-[#34D399] shrink-0" />
+                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                   {selectedExpense.description}
                 </h4>
               </div>
-              <span className="text-xs font-extrabold text-slate-900 tabular-nums">
+              <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 tabular-nums">
                 {formatCurrency(selectedExpense.amount, selectedExpense.currencyCode || activeCurrency)}
               </span>
             </div>
 
-            <div className="text-[11px] text-slate-500 space-y-1 pt-1 border-t border-slate-200/60">
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1 pt-1 border-t border-slate-200/60 dark:border-slate-800">
               <div className="flex justify-between">
                 <span>Paid by:</span>
-                <span className="font-semibold text-slate-800">{selectedExpense.paidByName}</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedExpense.paidByName}</span>
               </div>
               <div className="flex justify-between">
                 <span>Date:</span>
@@ -368,15 +397,15 @@ export function InspectorPane() {
             </div>
 
             {selectedExpense.comments.length > 0 && (
-              <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <div className="space-y-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <MessageSquare className="w-3 h-3" />
                   Comments ({selectedExpense.comments.length})
                 </span>
                 {selectedExpense.comments.map((comm) => (
-                  <div key={comm.id} className="p-2 rounded-xl bg-white border border-slate-200/60 text-xs">
-                    <span className="font-bold text-slate-800">{comm.authorName}: </span>
-                    <span className="text-slate-600">{comm.content}</span>
+                  <div key={comm.id} className="p-2 rounded-xl bg-white dark:bg-[#0F172A] border border-slate-200/60 dark:border-slate-800 text-xs">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{comm.authorName}: </span>
+                    <span className="text-slate-600 dark:text-slate-300">{comm.content}</span>
                   </div>
                 ))}
               </div>
@@ -389,7 +418,7 @@ export function InspectorPane() {
                 onChange={(e) => setCommentText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
                 placeholder="Add comment..."
-                className="flex-1 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#059669]"
+                className="flex-1 h-8 px-3 rounded-full bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981]"
               />
               <button
                 type="button"

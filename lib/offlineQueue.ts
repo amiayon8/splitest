@@ -2,12 +2,22 @@
 
 import { useEffect, useState } from 'react';
 
-const DB_NAME = 'splitest_offline_cache';
-const DB_VERSION = 1;
+const DATABASE_NAME = 'splitest_offline_cache';
+const DATABASE_VERSION = 2;
 
 export interface QueuedMutation {
   id: string;
-  type: 'create_expense' | 'update_expense' | 'delete_expense' | 'record_settlement' | 'create_group';
+  type:
+    | 'create_expense'
+    | 'delete_expense'
+    | 'record_settlement'
+    | 'create_group'
+    | 'update_group'
+    | 'send_chat_message'
+    | 'toggle_chat_like'
+    | 'add_comment'
+    | 'update_profile'
+    | 'add_friend';
   payload: Record<string, unknown>;
   timestamp: string;
 }
@@ -19,21 +29,24 @@ function openDatabase(): Promise<IDBDatabase> {
       return;
     }
 
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    const request = window.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains('groups')) {
-        db.createObjectStore('groups', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('expenses')) {
-        db.createObjectStore('expenses', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('settlements')) {
-        db.createObjectStore('settlements', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('mutations')) {
-        db.createObjectStore('mutations', { keyPath: 'id' });
+      const stores = [
+        'groups',
+        'expenses',
+        'settlements',
+        'chat_messages',
+        'friends',
+        'profiles',
+        'activities',
+        'mutations',
+      ];
+      for (const store of stores) {
+        if (!db.objectStoreNames.contains(store)) {
+          db.createObjectStore(store, { keyPath: 'id' });
+        }
       }
     };
 
@@ -51,7 +64,29 @@ export async function cacheItems<T>(storeName: string, items: T[]): Promise<void
       store.put(item);
     }
   } catch {
-    // Graceful fallback if indexedDB unavailable
+    return;
+  }
+}
+
+export async function setCachedItem<T>(storeName: string, item: T): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    store.put(item);
+  } catch {
+    return;
+  }
+}
+
+export async function deleteCachedItem(storeName: string, id: string): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    store.delete(id);
+  } catch {
+    return;
   }
 }
 
@@ -62,7 +97,7 @@ export async function getCachedItems<T>(storeName: string): Promise<T[]> {
       const tx = db.transaction(storeName, 'readonly');
       const store = tx.objectStore(storeName);
       const request = store.getAll();
-      request.onsuccess = () => resolve(request.result as T[]);
+      request.onsuccess = () => resolve((request.result as T[]) || []);
       request.onerror = () => resolve([]);
     });
   } catch {
@@ -76,7 +111,7 @@ export async function queueMutation(mutation: QueuedMutation): Promise<void> {
     const tx = db.transaction('mutations', 'readwrite');
     tx.objectStore('mutations').put(mutation);
   } catch {
-    // Graceful fallback
+    return;
   }
 }
 
@@ -90,7 +125,26 @@ export async function removePendingMutation(id: string): Promise<void> {
     const tx = db.transaction('mutations', 'readwrite');
     tx.objectStore('mutations').delete(id);
   } catch {
-    // Graceful fallback
+    return;
+  }
+}
+
+export async function clearPendingMutations(): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction('mutations', 'readwrite');
+    tx.objectStore('mutations').clear();
+  } catch {
+    return;
+  }
+}
+
+export async function countPendingMutations(): Promise<number> {
+  try {
+    const items = await getPendingMutations();
+    return items.length;
+  } catch {
+    return 0;
   }
 }
 

@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 @layer base {
   :root {
+    color-scheme: light;
     --color-primary: #059669;
     --color-primary-container: #d1fae5;
     --color-on-primary: #ffffff;
@@ -34,6 +35,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --color-primary: #10b981;
     --color-primary-container: #064e3b;
     --color-on-primary: #ffffff;

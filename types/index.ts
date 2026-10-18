@@ -1,3 +1,14 @@
+export interface FriendContact {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  avatarUrl: string;
+  netBalance?: number;
+  groupCount?: number;
+  addedVia?: 'link' | 'username' | 'group' | 'search' | 'directory';
+}
+
 export interface GroupMember {
   id: string;
   groupId: string;
@@ -104,6 +115,7 @@ export interface UserProfile {
   id: string;
   email: string;
   fullName: string;
+  username?: string;
   avatarUrl: string;
   defaultCurrency: string;
   phone?: string;
@@ -137,5 +149,6 @@ export interface GroupChatMessage {
   content: string;
   mentions: string[];
   attachment?: ChatAttachment;
+  likes?: string[];
   createdAt: string;
 }

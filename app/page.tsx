@@ -9,7 +9,6 @@ import { InspectorPane } from "@/components/InspectorPane";
 import { AllExpensesView } from "@/components/AllExpensesView";
 import { GroupsView } from "@/components/GroupsView";
 import { AnalyticsView } from "@/components/AnalyticsView";
-import { SettingsView } from "@/components/SettingsView";
 import { ProfileView } from "@/components/ProfileView";
 import { GroupChatView } from "@/components/GroupChatView";
 import { TransactionReceiptModal } from "@/components/TransactionReceiptModal";
@@ -17,6 +16,9 @@ import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { SettleModal } from "@/components/SettleModal";
 import { ShareGroupModal } from "@/components/ShareGroupModal";
 import { CreateGroupModal } from "@/components/CreateGroupModal";
+import { LedgerSettingsModal } from "@/components/LedgerSettingsModal";
+import { ShareProfileModal } from "@/components/ShareProfileModal";
+import { AddFriendModal } from "@/components/AddFriendModal";
 import { MobileNavigation } from "@/components/MobileNavigation";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { Toast } from "@/components/Toast";
@@ -41,7 +43,6 @@ export default function HomePage() {
           {currentView === "chat" && <GroupChatView />}
           {currentView === "analytics" && <AnalyticsView />}
           {currentView === "profile" && <ProfileView />}
-          {currentView === "settings" && <SettingsView />}
         </main>
 
         {currentView === "wallet" && <InspectorPane />}
@@ -54,7 +55,10 @@ export default function HomePage() {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
       />
+      <ShareProfileModal />
+      <AddFriendModal />
       <CreateGroupModal />
+      <LedgerSettingsModal />
       <MobileNavigation />
       <Toast />
     </div>
