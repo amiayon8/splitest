@@ -162,31 +162,45 @@ export function Header() {
             <button
               type="button"
               onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-              className="w-9 h-9 rounded-full ring-2 ring-emerald-200 dark:ring-emerald-800 hover:ring-[#059669] transition-all overflow-hidden focus:outline-none shadow-2xs shrink-0"
+              className="w-9 h-9 rounded-full ring-2 ring-emerald-200 dark:ring-emerald-800 hover:ring-[#059669] transition-all overflow-hidden focus:outline-none shadow-2xs shrink-0 flex items-center justify-center bg-[#059669] text-white"
               aria-label="Profile menu"
             >
-              <img
-                src={userProfile.avatarUrl}
-                alt={userProfile.fullName}
-                className="w-full h-full object-cover"
-              />
+              {userProfile.avatarUrl ? (
+                <img
+                  src={userProfile.avatarUrl}
+                  alt={userProfile.fullName || 'User'}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="font-bold text-xs uppercase">
+                  {(userProfile.fullName || userProfile.email || 'U').charAt(0)}
+                </span>
+              )}
             </button>
 
             {isProfileDropdownOpen && (
               <div className="absolute right-0 top-12 w-72 bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-200/90 dark:border-slate-700 shadow-xl py-2 z-50 animate-fade-in divide-y divide-slate-100 dark:divide-slate-800">
                 <div className="px-4 py-3 flex items-center gap-3">
-                  <img
-                    src={userProfile.avatarUrl}
-                    alt={userProfile.fullName}
-                    className="w-11 h-11 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                  />
+                  {userProfile.avatarUrl ? (
+                    <img
+                      src={userProfile.avatarUrl}
+                      alt={userProfile.fullName || 'User'}
+                      className="w-11 h-11 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-2xl bg-[#059669] text-white flex items-center justify-center font-bold text-base uppercase shrink-0 border border-slate-200 dark:border-slate-700">
+                      {(userProfile.fullName || userProfile.email || 'U').charAt(0)}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                      {userProfile.fullName}
+                      {userProfile.fullName || 'User'}
                     </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                      {userProfile.email}
-                    </p>
+                    {userProfile.email && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        {userProfile.email}
+                      </p>
+                    )}
                   </div>
                 </div>
 

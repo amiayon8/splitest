@@ -1,4 +1,6 @@
 import { FriendContact } from "@/types";
+import { getSupabaseClient } from "@/lib/supabase";
+import { getGravatarUrl } from "@/lib/avatar";
 
 export interface PublicUserProfile extends FriendContact {
   bio?: string;
@@ -52,6 +54,46 @@ export function findUserByUsername(
   );
 
   return partialMatch || null;
+}
+
+export async function fetchUserProfileFromDatabase(
+  rawUsernameOrUrl: string
+): Promise<PublicUserProfile | null> {
+  const normalized = normalizeUsernameInput(rawUsernameOrUrl);
+  if (!normalized) return null;
+
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data } = await client
+      .from("profiles")
+      .select("*")
+      .or(`username.ilike.${normalized},id.eq.${normalized},email.ilike.${normalized}`)
+      .maybeSingle();
+
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      name: data.full_name,
+      username: data.username || normalized,
+      email: data.email || "",
+      avatarUrl: data.avatar_url || (data.email ? getGravatarUrl(data.email) : ""),
+      bio: data.bio || undefined,
+      netBalance: 0,
+      groupCount: 0,
+      addedVia: "directory",
+      memberSince: data.created_at
+        ? new Date(data.created_at).toLocaleDateString(undefined, {
+            month: "short",
+            year: "numeric",
+          })
+        : undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function buildProfileShareUrl(username: string): string {

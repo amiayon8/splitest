@@ -14,7 +14,8 @@ import {
   FriendContact,
 } from '@/types';
 import { getSupabaseClient, saveSupabaseConfig } from '@/lib/supabase';
-import { findUserByUsername } from '@/lib/users-directory';
+import { findUserByUsername, fetchUserProfileFromDatabase } from '@/lib/users-directory';
+import { getGravatarUrl, isGoogleAvatarUrl } from '@/lib/avatar';
 import {
   cacheItems,
   getCachedItems,
@@ -85,7 +86,7 @@ interface SplitestContextType {
   showToast: (message: string) => void;
   allFriendsList: FriendContact[];
   addFriendDirectly: (friend: FriendContact) => void;
-  addFriendByUsername: (query: string) => { success: boolean; friend?: FriendContact; message: string };
+  addFriendByUsername: (query: string) => Promise<{ success: boolean; friend?: FriendContact; message: string }>;
   addExpense: (expenseData: {
     groupId: string;
     description: string;
@@ -142,11 +143,12 @@ const STORAGE_THEME_KEY = 'splitest_theme_preference';
 const STORAGE_FRIENDS_KEY = 'splitest_local_friends';
 
 const initialProfile: UserProfile = {
-  id: 'usr-current',
+  id: '',
   username: '',
   email: '',
   fullName: '',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  avatarUrl: '',
+  googleAvatarUrl: '',
   defaultCurrency: 'USD',
   phone: '',
   paymentHandle: '',
@@ -618,6 +620,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         commentsResponse,
         chatResponse,
         friendsResponse,
+        authUserData,
       ] = await Promise.all([
         client.from('groups').select('*').order('created_at', { ascending: false }),
         client.from('group_members').select('*'),
@@ -627,22 +630,108 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         client.from('comments').select('*').order('created_at', { ascending: true }),
         client.from('chat_messages').select('*').order('created_at', { ascending: true }),
         client.from('friends').select('*').order('created_at', { ascending: false }),
+        client.auth.getUser(),
       ]);
 
       if (groupsResponse.error) throw groupsResponse.error;
 
-      if (!groupsResponse.data || groupsResponse.data.length === 0) {
-        setGroups([]);
-        setAllExpenses([]);
-        setAllSettlements([]);
-        setAllChatMessages([]);
-        setCustomFriends([]);
-        setSupabaseStatus('connected');
-        return;
+      const authUser = authUserData?.data?.user;
+      if (authUser) {
+        const googlePhoto =
+          authUser.user_metadata?.avatar_url ||
+          authUser.user_metadata?.picture ||
+          '';
+        const gravatarPhoto = authUser.email ? getGravatarUrl(authUser.email) : '';
+
+        const { data: profileRecord } = await client
+          .from('profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .maybeSingle();
+
+        if (profileRecord) {
+          const effectiveAvatar =
+            profileRecord.avatar_url ||
+            googlePhoto ||
+            gravatarPhoto ||
+            '';
+          const loadedProfile: UserProfile = {
+            id: profileRecord.id,
+            email: profileRecord.email || authUser.email || '',
+            fullName: profileRecord.full_name || authUser.user_metadata?.full_name || '',
+            username: profileRecord.username || '',
+            avatarUrl: effectiveAvatar,
+            googleAvatarUrl: googlePhoto,
+            defaultCurrency: profileRecord.default_currency || 'USD',
+            phone: profileRecord.phone || '',
+            paymentHandle: profileRecord.payment_handle || '',
+            themePreference: (profileRecord.theme_preference as ThemeMode) || 'system',
+            googleConnected: profileRecord.google_connected || !!authUser.app_metadata?.provider?.includes('google'),
+            googleEmail: profileRecord.google_email || (authUser.app_metadata?.provider?.includes('google') ? authUser.email : ''),
+            notificationsEnabled: profileRecord.notifications_enabled ?? true,
+            notifyOnExpense: profileRecord.notify_on_expense ?? true,
+            notifyOnSettlement: profileRecord.notify_on_settlement ?? true,
+            notifyOnMention: profileRecord.notify_on_mention ?? true,
+            notifyWeeklyDigest: profileRecord.notify_weekly_digest ?? false,
+          };
+          setUserProfile(loadedProfile);
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(loadedProfile));
+          }
+        } else {
+          const effectiveAvatar = googlePhoto || gravatarPhoto || '';
+          const initialName =
+            authUser.user_metadata?.full_name ||
+            authUser.user_metadata?.name ||
+            (authUser.email ? authUser.email.split('@')[0] : 'User');
+          const initialUsername = initialName.toLowerCase().replace(/[^a-z0-9]/g, '.');
+          const newProfile = {
+            id: authUser.id,
+            email: authUser.email || '',
+            full_name: initialName,
+            username: initialUsername,
+            avatar_url: effectiveAvatar,
+            default_currency: 'USD',
+            phone: '',
+            payment_handle: '',
+            theme_preference: 'system',
+            google_connected: !!authUser.app_metadata?.provider?.includes('google'),
+            google_email: authUser.app_metadata?.provider?.includes('google') ? authUser.email : '',
+            notifications_enabled: true,
+            notify_on_expense: true,
+            notify_on_settlement: true,
+            notify_on_mention: true,
+            notify_weekly_digest: false,
+          };
+          await client.from('profiles').upsert(newProfile);
+          const loadedProfile: UserProfile = {
+            id: newProfile.id,
+            email: newProfile.email,
+            fullName: newProfile.full_name,
+            username: newProfile.username,
+            avatarUrl: newProfile.avatar_url,
+            googleAvatarUrl: googlePhoto,
+            defaultCurrency: newProfile.default_currency,
+            phone: newProfile.phone,
+            paymentHandle: newProfile.payment_handle,
+            themePreference: 'system',
+            googleConnected: newProfile.google_connected,
+            googleEmail: newProfile.google_email,
+            notificationsEnabled: true,
+            notifyOnExpense: true,
+            notifyOnSettlement: true,
+            notifyOnMention: true,
+            notifyWeeklyDigest: false,
+          };
+          setUserProfile(loadedProfile);
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(loadedProfile));
+          }
+        }
       }
 
       const fetchedMembers = membersResponse.data || [];
-      const builtGroups: Group[] = groupsResponse.data.map((item) => ({
+      const builtGroups: Group[] = (groupsResponse.data || []).map((item) => ({
         id: item.id,
         name: item.name,
         icon: item.icon || 'Users',
@@ -662,7 +751,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             groupId: m.group_id,
             name: m.name,
             email: m.email,
-            avatarUrl: m.avatar_url,
+            avatarUrl: m.avatar_url || (m.email ? getGravatarUrl(m.email) : ''),
             role: m.role === 'owner' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'editor',
             isCurrentUser: m.is_current_user || false,
           })),
@@ -735,7 +824,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         name: f.name,
         username: f.username || f.name.toLowerCase().replace(/[^a-z0-9]/g, '.'),
         email: f.email || '',
-        avatarUrl: f.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        avatarUrl: f.avatar_url || (f.email ? getGravatarUrl(f.email) : ''),
         netBalance: Number(f.net_balance) || 0,
         groupCount: Number(f.group_count) || 0,
         addedVia: f.added_via || 'directory',
@@ -797,6 +886,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         window.location.href = "/login";
       } else if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
         document.cookie = `splitest_session=authenticated; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+        void fetchSupabaseDataRef.current();
       }
     });
 
@@ -875,6 +965,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
     const channel = client
       .channel('public-db-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, triggerDebouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, triggerDebouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, triggerDebouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, triggerDebouncedFetch)
@@ -1251,8 +1342,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           id: `member-${newGroupId}-${index}`,
           groupId: newGroupId,
           name: mName,
-          email: `${mName.toLowerCase().replace(/\s+/g, '')}@splitest.app`,
-          avatarUrl: `https://images.unsplash.com/photo-${1534528741775 + index * 1000}?auto=format&fit=crop&w=160&q=80`,
+          email: mName === 'You' ? userProfile.email : '',
+          avatarUrl: mName === 'You' ? userProfile.avatarUrl || '' : '',
           role: mName === 'You' ? 'owner' : 'editor',
           isCurrentUser: mName === 'You',
         })),
@@ -1613,8 +1704,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           id: `member-${newGroupId}-${index}`,
           groupId: newGroupId,
           name: mName,
-          email: `${mName.toLowerCase().replace(/\s+/g, '')}@splitest.app`,
-          avatarUrl: `https://images.unsplash.com/photo-${1534528741775 + index * 1000}?auto=format&fit=crop&w=160&q=80`,
+          email: mName === 'You' ? userProfile.email : '',
+          avatarUrl: mName === 'You' ? userProfile.avatarUrl || '' : '',
           role: mName === 'You' ? 'owner' : 'editor',
           isCurrentUser: mName === 'You',
         })),
@@ -1656,7 +1747,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
       return newGroupId;
     },
-    [isOnline, refreshPendingCount, showToast]
+    [isOnline, refreshPendingCount, showToast, userProfile.email, userProfile.avatarUrl]
   );
 
   const addMembersToGroup = useCallback(
@@ -1672,8 +1763,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         id: `member-${groupId}-${Date.now()}-${index}`,
         groupId,
         name,
-        email: `${name.toLowerCase().replace(/\s+/g, '')}@splitest.app`,
-        avatarUrl: `https://images.unsplash.com/photo-${1534528741775 + ((index + 1) * 3137) % 10000}?auto=format&fit=crop&w=160&q=80`,
+        email: '',
+        avatarUrl: '',
         role: 'editor',
         isCurrentUser: false,
       }));
@@ -1839,8 +1930,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               id: member.id,
               name: member.name,
               username: generatedUsername,
-              avatarUrl: member.avatarUrl,
-              email: member.email || `${generatedUsername}@example.com`,
+              avatarUrl: member.avatarUrl || (member.email ? getGravatarUrl(member.email) : ''),
+              email: member.email || '',
               groupCount: 1,
             });
           }
@@ -1900,23 +1991,26 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addFriendByUsername = useCallback(
-    (query: string) => {
-      const match = findUserByUsername(query, allFriendsList);
+    async (query: string) => {
+      let match = findUserByUsername(query, allFriendsList);
+      if (!match) {
+        match = await fetchUserProfileFromDatabase(query);
+      }
       if (!match) {
         return {
           success: false,
           message: 'No user found with that username or profile link.',
         };
       }
-      const currentUsername = userProfile.username || 'you.splitest';
-      if (match.username.toLowerCase() === currentUsername.toLowerCase()) {
+      const currentUsername = userProfile.username || '';
+      if (currentUsername && match.username.toLowerCase() === currentUsername.toLowerCase()) {
         return {
           success: false,
           message: 'You cannot add yourself as a friend.',
         };
       }
       const alreadyExists = allFriendsList.some(
-        (item) => item.username.toLowerCase() === match.username.toLowerCase()
+        (item) => item.username.toLowerCase() === match!.username.toLowerCase()
       );
       if (alreadyExists) {
         return {
@@ -1925,7 +2019,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           message: `@${match.username} is already in your friends list.`,
         };
       }
-      void addFriendDirectly(match);
+      await addFriendDirectly(match);
       return {
         success: true,
         friend: match,

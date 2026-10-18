@@ -27,7 +27,9 @@ export function ShareProfileModal() {
   if (!isShareProfileModalOpen) return null;
 
   const currentUsername =
-    userProfile.username || userProfile.paymentHandle || "you.splitest";
+    userProfile.username ||
+    userProfile.paymentHandle ||
+    (userProfile.fullName ? userProfile.fullName.toLowerCase().replace(/[^a-z0-9]/g, '.') : 'user');
   const profileUrl = buildProfileShareUrl(currentUsername);
 
   const handleCopy = async () => {
@@ -45,7 +47,7 @@ export function ShareProfileModal() {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
-          title: `${userProfile.fullName} on Splitest`,
+          title: `${userProfile.fullName || 'User'} on Splitest`,
           text: `Add me on Splitest to split expenses and manage shared group tabs effortlessly: @${currentUsername}`,
           url: profileUrl,
         });
@@ -106,14 +108,14 @@ export function ShareProfileModal() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-primary font-bold text-lg">
-                  {userProfile.fullName.charAt(0)}
+                  {(userProfile.fullName || userProfile.email || 'U').charAt(0)}
                 </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-semibold text-slate-900 dark:text-white truncate">
-                  {userProfile.fullName}
+                  {userProfile.fullName || 'User'}
                 </p>
                 <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
               </div>

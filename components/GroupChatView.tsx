@@ -27,56 +27,7 @@ import {
   Info,
 } from "lucide-react";
 
-const PRESET_FRIENDS_DIRECTORY = [
-  {
-    name: "Alex Rivera",
-    email: "alex@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=160&q=80",
-  },
-  {
-    name: "Maya Chen",
-    email: "maya@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=160&q=80",
-  },
-  {
-    name: "Liam Vance",
-    email: "liam@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80",
-  },
-  {
-    name: "Sophia Taylor",
-    email: "sophia@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80",
-  },
-  {
-    name: "Chloe Patel",
-    email: "chloe@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=160&q=80",
-  },
-  {
-    name: "Sarah Jenkins",
-    email: "sarah@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80",
-  },
-  {
-    name: "Marcus Brody",
-    email: "marcus@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80",
-  },
-  {
-    name: "Elena Rostova",
-    email: "elena@example.com",
-    avatarUrl:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80",
-  },
-];
+
 
 export function GroupChatView() {
   const {
@@ -159,22 +110,10 @@ export function GroupChatView() {
           map.set(member.name, {
             name: member.name,
             username: generatedUsername,
-            email:
-              member.email ||
-              `${member.name.toLowerCase().replace(/\s+/g, "")}@example.com`,
-            avatarUrl: member.avatarUrl,
+            email: member.email || "",
+            avatarUrl: member.avatarUrl || "",
           });
         }
-      }
-    }
-
-    for (const preset of PRESET_FRIENDS_DIRECTORY) {
-      if (!map.has(preset.name)) {
-        const generatedUsername = preset.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
-        map.set(preset.name, {
-          ...preset,
-          username: generatedUsername,
-        });
       }
     }
 
@@ -187,8 +126,8 @@ export function GroupChatView() {
         map.set(friend.name, {
           name: friend.name,
           username: friend.username,
-          email: friend.email || `${friend.username}@example.com`,
-          avatarUrl: friend.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          email: friend.email || "",
+          avatarUrl: friend.avatarUrl || "",
         });
       }
     });

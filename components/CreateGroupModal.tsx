@@ -17,7 +17,7 @@ export function CreateGroupModal() {
   const [groupName, setGroupName] = useState('');
   const [category, setCategory] = useState('Trip');
   const [currency, setCurrency] = useState(activeCurrency || 'USD');
-  const [membersInput, setMembersInput] = useState('Alex Rivera, Maya Chen');
+  const [membersInput, setMembersInput] = useState('');
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -31,7 +31,7 @@ export function CreateGroupModal() {
     await createGroup(groupName.trim(), category, 'Users', parsedMembers);
     showToast(`Created group "${groupName.trim()}"`);
     setGroupName('');
-    setMembersInput('Alex Rivera, Maya Chen');
+    setMembersInput('');
     setIsNewGroupModalOpen(false);
   };
 
@@ -121,7 +121,7 @@ export function CreateGroupModal() {
               type="text"
               value={membersInput}
               onChange={(e) => setMembersInput(e.target.value)}
-              placeholder="Alex, Sarah, Liam"
+              placeholder="e.g. Sarah, Liam (optional)"
               className="w-full h-11 px-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981]"
             />
             <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 block">You are automatically added as the group owner.</span>

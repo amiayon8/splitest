@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSplitest } from "@/lib/store";
 import {
   findUserByUsername,
+  fetchUserProfileFromDatabase,
   buildProfileShareUrl,
   PublicUserProfile,
 } from "@/lib/users-directory";
@@ -37,17 +38,39 @@ export default function ProfileClient({ username }: ProfileClientProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [addedSuccess, setAddedSuccess] = useState(false);
+  const [targetUser, setTargetUser] = useState<PublicUserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const targetUser: PublicUserProfile | null = useMemo(() => {
-    return findUserByUsername(username);
-  }, [username]);
+  useEffect(() => {
+    let active = true;
+    async function loadUser() {
+      setIsLoading(true);
+      const localMatch = findUserByUsername(username, allFriendsList);
+      if (localMatch) {
+        if (active) {
+          setTargetUser(localMatch);
+          setIsLoading(false);
+        }
+        return;
+      }
+      const fetched = await fetchUserProfileFromDatabase(username);
+      if (active) {
+        setTargetUser(fetched);
+        setIsLoading(false);
+      }
+    }
+    void loadUser();
+    return () => {
+      active = false;
+    };
+  }, [username, allFriendsList]);
 
   const isSelf = useMemo(() => {
     if (!targetUser) return false;
-    const currentHandle = userProfile.paymentHandle || "you.splitest";
+    const currentHandle = userProfile.username || userProfile.paymentHandle || "";
     return (
-      targetUser.username.toLowerCase() === currentHandle.toLowerCase() ||
-      targetUser.email.toLowerCase() === userProfile.email.toLowerCase()
+      (currentHandle && targetUser.username.toLowerCase() === currentHandle.toLowerCase()) ||
+      (userProfile.email && targetUser.email.toLowerCase() === userProfile.email.toLowerCase())
     );
   }, [targetUser, userProfile]);
 
@@ -94,6 +117,14 @@ export default function ProfileClient({ username }: ProfileClientProps) {
     setCurrentView("chat");
     router.push("/");
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#090D16] flex items-center justify-center p-6 text-slate-400">
+        <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!targetUser) {
     return (
@@ -155,11 +186,17 @@ export default function ProfileClient({ username }: ProfileClientProps) {
         <div className="px-6 pb-6 pt-0 relative">
           <div className="flex justify-between items-end -mt-12 mb-4">
             <div className="relative">
-              <img
-                src={targetUser.avatarUrl}
-                alt={targetUser.name}
-                className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-[#0F172A] shadow-md bg-slate-100 dark:bg-slate-800"
-              />
+              {targetUser.avatarUrl ? (
+                <img
+                  src={targetUser.avatarUrl}
+                  alt={targetUser.name}
+                  className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-[#0F172A] shadow-md bg-slate-100 dark:bg-slate-800"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-[#059669] text-white flex items-center justify-center font-bold text-3xl uppercase border-4 border-white dark:border-[#0F172A] shadow-md">
+                  {targetUser.name.charAt(0)}
+                </div>
+              )}
               <div className="w-4 h-4 rounded-full bg-[#10B981] border-2 border-white dark:border-[#0F172A] absolute bottom-1 right-1" />
             </div>
 
@@ -174,7 +211,7 @@ export default function ProfileClient({ username }: ProfileClientProps) {
               {targetUser.name}
             </h1>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              @{targetUser.username} &bull; {targetUser.email}
+              @{targetUser.username} {targetUser.email ? `• ${targetUser.email}` : ''}
             </p>
           </div>
 

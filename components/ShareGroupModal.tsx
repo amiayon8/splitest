@@ -240,10 +240,11 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                        {member.email ||
-                          `${member.name.toLowerCase().replace(" ", ".")}@example.com`}
-                      </span>
+                      {member.email ? (
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                          {member.email}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 

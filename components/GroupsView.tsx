@@ -94,7 +94,7 @@ export function GroupsView() {
         friendsMap.set(friend.name.toLowerCase(), {
           name: friend.name,
           username: friend.username,
-          avatarUrl: friend.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          avatarUrl: friend.avatarUrl || '',
           netBalance: 0,
           groupCount: friend.groupCount || 0,
         });
@@ -104,7 +104,10 @@ export function GroupsView() {
     return Array.from(friendsMap.values());
   }, [groups, allExpenses, allSettlements, allFriendsList]);
 
-  const currentUsername = userProfile.username || userProfile.paymentHandle || 'you.splitest';
+  const currentUsername =
+    userProfile.username ||
+    userProfile.paymentHandle ||
+    (userProfile.fullName ? userProfile.fullName.toLowerCase().replace(/[^a-z0-9]/g, '.') : 'user');
   const profileUrl = buildProfileShareUrl(currentUsername);
 
   const handleCopyProfileLink = async () => {
@@ -333,11 +336,17 @@ export function GroupsView() {
             {friendsList.map((friend) => (
               <div key={friend.name} className="p-4 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <img
-                    src={friend.avatarUrl}
-                    alt={friend.name}
-                    className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                  />
+                  {friend.avatarUrl ? (
+                    <img
+                      src={friend.avatarUrl}
+                      alt={friend.name}
+                      className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-xs uppercase border border-slate-200 dark:border-slate-700 shrink-0">
+                      {friend.name.charAt(0)}
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">

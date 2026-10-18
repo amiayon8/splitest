@@ -1,27 +1,28 @@
-import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans } from 'next/font/google';
-import './material-symbols.css';
-import './globals.css';
-import { SplitestProvider } from '@/lib/store';
+import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
+import "./material-symbols.css";
+import "./globals.css";
+import { SplitestProvider } from "@/lib/store";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: '--font-plus-jakarta-sans',
-  subsets: ['latin'],
-  display: 'swap',
+  variable: "--font-plus-jakarta-sans",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: 'Splitest | Shared Wallet & Expense Hub',
-  description: 'Shared ledger and debt resolution platform with real-time sync powered by Supabase.',
+  title: "Splitest | Collaborative Wallet & Expense Hub",
+  description:
+    "Shared ledger and debt resolution platform with real-time sync powered by Supabase.",
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/Splitest.svg', type: 'image/svg+xml' },
-      { url: '/icon.png', type: 'image/png' },
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/Splitest.svg", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png" },
     ],
-    apple: '/apple-touch-icon.png',
+    apple: "/apple-touch-icon.png",
   },
-  manifest: '/manifest.json',
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -30,7 +31,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${plusJakartaSans.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${plusJakartaSans.variable} h-full antialiased`}
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{

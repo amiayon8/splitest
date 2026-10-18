@@ -117,6 +117,7 @@ export interface UserProfile {
   fullName: string;
   username?: string;
   avatarUrl: string;
+  googleAvatarUrl?: string;
   defaultCurrency: string;
   phone?: string;
   paymentHandle?: string;

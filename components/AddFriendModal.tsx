@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { useSplitest } from '@/lib/store';
 import {
   findUserByUsername,
+  fetchUserProfileFromDatabase,
   normalizeUsernameInput,
-  PRESET_USERS_DIRECTORY,
   PublicUserProfile,
 } from '@/lib/users-directory';
 import {
@@ -26,6 +26,7 @@ export function AddFriendModal() {
     isAddFriendModalOpen,
     setIsAddFriendModalOpen,
     allFriendsList,
+    groups,
     addFriendDirectly,
     addFriendByUsername,
     setIsShareProfileModalOpen,
@@ -34,19 +35,75 @@ export function AddFriendModal() {
 
   const [inputQuery, setInputQuery] = useState('');
   const [statusMessage, setStatusMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [matchedUser, setMatchedUser] = useState<PublicUserProfile | null>(null);
+
+  const normalizedInput = useMemo(() => normalizeUsernameInput(inputQuery), [inputQuery]);
+
+  useEffect(() => {
+    let active = true;
+    if (!normalizedInput) {
+      setMatchedUser(null);
+      return;
+    }
+
+    const localMatch = findUserByUsername(normalizedInput, allFriendsList);
+    if (localMatch) {
+      setMatchedUser(localMatch);
+      return;
+    }
+
+    async function searchDb() {
+      const dbMatch = await fetchUserProfileFromDatabase(normalizedInput);
+      if (active) {
+        setMatchedUser(dbMatch);
+      }
+    }
+
+    const timer = setTimeout(() => {
+      void searchDb();
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [normalizedInput, allFriendsList]);
+
+  const suggestedMembers = useMemo(() => {
+    const list: PublicUserProfile[] = [];
+    const seen = new Set<string>();
+    groups.forEach((g) => {
+      g.members.forEach((m) => {
+        if (!m.isCurrentUser) {
+          const username = m.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+          if (!seen.has(username) && !allFriendsList.some((f) => f.username.toLowerCase() === username)) {
+            seen.add(username);
+            list.push({
+              id: m.id,
+              name: m.name,
+              username,
+              avatarUrl: m.avatarUrl || '',
+              email: m.email || '',
+              netBalance: 0,
+              groupCount: 1,
+              addedVia: 'directory',
+            });
+          }
+        }
+      });
+    });
+    return list;
+  }, [groups, allFriendsList]);
 
   if (!isAddFriendModalOpen) return null;
-
-  const normalizedInput = normalizeUsernameInput(inputQuery);
-  const matchedUser: PublicUserProfile | null = normalizedInput ? findUserByUsername(normalizedInput) : null;
 
   const isAlreadyFriend = (username: string) => {
     return allFriendsList.some((item) => item.username.toLowerCase() === username.toLowerCase());
   };
 
-  const handleAddMatched = () => {
+  const handleAddMatched = async () => {
     if (!inputQuery.trim()) return;
-    const result = addFriendByUsername(inputQuery);
+    const result = await addFriendByUsername(inputQuery);
     if (result.success) {
       setStatusMessage({ type: 'success', text: result.message });
       setInputQuery('');
@@ -58,12 +115,12 @@ export function AddFriendModal() {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      handleAddMatched();
+      void handleAddMatched();
     }
   };
 
   const handleQuickAdd = (user: PublicUserProfile) => {
-    addFriendDirectly(user);
+    void addFriendDirectly(user);
     setStatusMessage({ type: 'success', text: `Added @${user.username} to your friends list!` });
   };
 
@@ -109,7 +166,7 @@ export function AddFriendModal() {
                 setStatusMessage(null);
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Enter username (e.g. alex.rivera) or paste /u/ link..."
+              placeholder="Enter username or paste /u/ link..."
               className="w-full pl-10 pr-24 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary text-slate-900 dark:text-white placeholder:text-slate-400"
               autoFocus
             />
@@ -197,64 +254,72 @@ export function AddFriendModal() {
             <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Suggested Contacts
             </h4>
-            <span className="text-[11px] text-slate-400">Splitest Directory</span>
+            <span className="text-[11px] text-slate-400">Your Groups</span>
           </div>
 
-          <div className="space-y-2">
-            {PRESET_USERS_DIRECTORY.map((user) => {
-              const alreadyAdded = isAlreadyFriend(user.username);
-              return (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative w-9 h-9 rounded-full overflow-hidden shrink-0 bg-slate-200 dark:bg-slate-700">
-                      {user.avatarUrl ? (
-                        <Image
-                          src={user.avatarUrl}
-                          alt={user.name}
-                          fill
-                          sizes="36px"
-                          className="object-cover"
-                        />
+          {suggestedMembers.length > 0 ? (
+            <div className="space-y-2">
+              {suggestedMembers.map((user) => {
+                const alreadyAdded = isAlreadyFriend(user.username);
+                return (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative w-9 h-9 rounded-full overflow-hidden shrink-0 bg-slate-200 dark:bg-slate-700">
+                        {user.avatarUrl ? (
+                          <Image
+                            src={user.avatarUrl}
+                            alt={user.name}
+                            fill
+                            sizes="36px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center font-medium text-slate-700 dark:text-slate-300 text-xs">
+                            {user.name.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                          {user.name}
+                        </p>
+                        <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate">
+                          @{user.username}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      {alreadyAdded ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 px-2 py-1">
+                          <Check className="w-3 h-3" />
+                          Added
+                        </span>
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center font-medium text-slate-700 dark:text-slate-300 text-xs">
-                          {user.name.charAt(0)}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdd(user)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-primary hover:text-primary text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
+                        >
+                          <UserPlus className="w-3 h-3" />
+                          Add
+                        </button>
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
-                        {user.name}
-                      </p>
-                      <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate">
-                        @{user.username}
-                      </p>
-                    </div>
                   </div>
-
-                  <div>
-                    {alreadyAdded ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 px-2 py-1">
-                        <Check className="w-3 h-3" />
-                        Added
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAdd(user)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-primary hover:text-primary text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
-                      >
-                        <UserPlus className="w-3 h-3" />
-                        Add
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-8 px-4 text-center">
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                No suggested contacts from your groups yet. Search by username above to add friends.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 text-xs text-slate-500">

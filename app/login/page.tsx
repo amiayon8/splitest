@@ -238,7 +238,7 @@ function LoginForm() {
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Alex Rivera"
+                    placeholder="Enter your full name"
                     required={authMode === "signup"}
                     className="w-full h-11 px-4 pl-10 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981] focus:ring-1 focus:ring-[#059669]"
                   />
