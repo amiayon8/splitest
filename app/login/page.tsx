@@ -24,6 +24,25 @@ function LoginForm() {
     router.refresh();
   };
 
+  React.useEffect(() => {
+    const hasCookie =
+      typeof document !== "undefined" &&
+      document.cookie.includes("splitest_session=authenticated");
+    if (hasCookie) {
+      router.push(nextPath);
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          establishSession();
+        }
+      });
+    }
+  }, [nextPath]);
+
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setErrorMsg("");

@@ -36,7 +36,7 @@ export default function HomePage() {
           <Sidebar />
         </div>
 
-        <main className="flex-1 min-w-0 md:pl-20 lg:pl-[260px]">
+        <main className="flex-1 min-w-0 md:pl-20 lg:pl-65">
           {currentView === "wallet" && <ExpenseFeed />}
           {currentView === "expenses" && <AllExpensesView />}
           {currentView === "groups" && <GroupsView />}

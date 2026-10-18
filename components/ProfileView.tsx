@@ -194,7 +194,7 @@ export function ProfileView() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-slate-400" />
                 Full Name
               </label>
@@ -208,7 +208,7 @@ export function ProfileView() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-slate-400" />
                 Contact Email
               </label>
@@ -222,7 +222,7 @@ export function ProfileView() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 items-center gap-1.5">
                 <AtSign className="w-3.5 h-3.5 text-slate-400" />
                 Username
               </label>
@@ -241,7 +241,7 @@ export function ProfileView() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-slate-400" />
                 Phone Number
               </label>
@@ -255,7 +255,7 @@ export function ProfileView() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                 Settlement Payment Handle
               </label>

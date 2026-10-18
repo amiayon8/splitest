@@ -136,7 +136,7 @@ export default function ProfileClient({ username }: ProfileClientProps) {
       </header>
 
       <div className="w-full max-w-md bg-white dark:bg-[#0F172A] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden animate-scale-in">
-        <div className="h-28 bg-gradient-to-r from-emerald-600 to-teal-500 relative">
+        <div className="h-28 bg-linear-to-r from-emerald-600 to-teal-500 relative">
           <button
             type="button"
             onClick={handleCopyLink}

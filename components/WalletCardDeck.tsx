@@ -26,6 +26,7 @@ export function WalletCardDeck() {
     setIsSettleModalOpen,
     setIsShareModalOpen,
     setIsLedgerSettingsModalOpen,
+    setIsNewGroupModalOpen,
     activeCurrency,
   } = useSplitest();
 
@@ -254,6 +255,30 @@ export function WalletCardDeck() {
     scrollToCard(index);
   };
 
+  if (groups.length === 0) {
+    return (
+      <div className="w-full rounded-3xl p-8 border border-dashed border-slate-300 dark:border-slate-800 bg-white/50 dark:bg-[#1E293B]/40 flex flex-col items-center justify-center text-center gap-3 select-none">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-[#059669] dark:text-[#34D399] flex items-center justify-center">
+          <Users className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+          No Groups in Database
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
+          Create your first group ledger to begin tracking expenses and resolving debts.
+        </p>
+        <button
+          type="button"
+          onClick={() => setIsNewGroupModalOpen(true)}
+          className="mt-2 flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Create First Group</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3 w-full select-none">
       <div className="relative w-full">
@@ -309,7 +334,7 @@ export function WalletCardDeck() {
                 style={{
                   transform: dynamicRotation ? `rotate(${dynamicRotation}deg)` : undefined,
                 }}
-                className={`snap-center shrink-0 w-[88vw] sm:w-[440px] max-w-[460px] rounded-3xl p-6 border flex flex-col justify-between gap-5 cursor-pointer ${
+                className={`snap-center shrink-0 w-[88vw] sm:w-110 max-w-115 rounded-3xl p-6 border flex flex-col justify-between gap-5 cursor-pointer ${
                   isDragging ? "transition-none" : "transition-all duration-300 ease-out"
                 } ${
                   isSelected

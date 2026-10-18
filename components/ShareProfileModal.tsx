@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Image from 'next/image';
-import { useSplitest } from '@/lib/store';
-import { buildProfileShareUrl } from '@/lib/users-directory';
+import React, { useState } from "react";
+import Image from "next/image";
+import { useSplitest } from "@/lib/store";
+import { buildProfileShareUrl } from "@/lib/users-directory";
 import {
   X,
   Copy,
@@ -13,37 +13,43 @@ import {
   QrCode,
   ShieldCheck,
   Sparkles,
-} from 'lucide-react';
+} from "lucide-react";
 
 export function ShareProfileModal() {
-  const { userProfile, isShareProfileModalOpen, setIsShareProfileModalOpen, showToast } = useSplitest();
+  const {
+    userProfile,
+    isShareProfileModalOpen,
+    setIsShareProfileModalOpen,
+    showToast,
+  } = useSplitest();
   const [copied, setCopied] = useState(false);
 
   if (!isShareProfileModalOpen) return null;
 
-  const currentUsername = userProfile.username || userProfile.paymentHandle || 'you.splitest';
+  const currentUsername =
+    userProfile.username || userProfile.paymentHandle || "you.splitest";
   const profileUrl = buildProfileShareUrl(currentUsername);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
-      showToast('Profile link copied to clipboard');
+      showToast("Profile link copied to clipboard");
       setTimeout(() => setCopied(false), 2200);
     } catch {
-      showToast('Could not copy automatically. Please copy the URL below.');
+      showToast("Could not copy automatically. Please copy the URL below.");
     }
   };
 
   const handleNativeShare = async () => {
-    if (typeof navigator !== 'undefined' && navigator.share) {
+    if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
           title: `${userProfile.fullName} on Splitest`,
           text: `Add me on Splitest to split expenses and manage shared group tabs effortlessly: @${currentUsername}`,
           url: profileUrl,
         });
-        showToast('Profile shared');
+        showToast("Profile shared");
       } catch {
         return;
       }
@@ -61,7 +67,7 @@ export function ShareProfileModal() {
         className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary via-emerald-400 to-teal-500" />
+        <div className="absolute top-0 left-0 right-0 h-2 bg-linear-to-r from-primary via-emerald-400 to-teal-500" />
 
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
@@ -69,8 +75,12 @@ export function ShareProfileModal() {
               <Share2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Share Your Profile</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Invite friends to connect on Splitest</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Share Your Profile
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Invite friends to connect on Splitest
+              </p>
             </div>
           </div>
           <button
@@ -85,7 +95,7 @@ export function ShareProfileModal() {
 
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 mb-5">
           <div className="flex items-center gap-3.5 mb-3">
-            <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-primary/30 flex-shrink-0 bg-slate-200 dark:bg-slate-700">
+            <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-primary/30 shrink-0 bg-slate-200 dark:bg-slate-700">
               {userProfile.avatarUrl ? (
                 <Image
                   src={userProfile.avatarUrl}
@@ -105,7 +115,7 @@ export function ShareProfileModal() {
                 <p className="font-semibold text-slate-900 dark:text-white truncate">
                   {userProfile.fullName}
                 </p>
-                <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
+                <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
               </div>
               <p className="text-xs font-mono text-primary font-medium truncate">
                 @{currentUsername}
@@ -123,7 +133,7 @@ export function ShareProfileModal() {
             </span>
             <span className="flex items-center gap-1 font-mono text-[11px] bg-slate-200/60 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-700 dark:text-slate-200">
               <QrCode className="w-3 h-3 text-slate-500" />
-              splitest.app/u/{currentUsername}
+              splitest.thenicedev.xyz/u/{currentUsername}
             </span>
           </div>
         </div>
@@ -141,8 +151,8 @@ export function ShareProfileModal() {
               onClick={handleCopy}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 copied
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-primary text-white hover:bg-primary-hover shadow-sm'
+                  ? "bg-emerald-600 text-white"
+                  : "bg-primary text-white hover:bg-primary-hover shadow-sm"
               }`}
             >
               {copied ? (

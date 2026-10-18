@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useSplitest } from '@/lib/store';
+import React, { useState } from "react";
+import { useSplitest } from "@/lib/store";
 import {
   X,
   Copy,
@@ -12,7 +12,7 @@ import {
   RotateCw,
   UserCheck,
   ChevronDown,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface ShareGroupModalProps {
   isOpen: boolean;
@@ -22,9 +22,11 @@ interface ShareGroupModalProps {
 export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
   const { activeGroup, showToast } = useSplitest();
 
-  const [emailInput, setEmailInput] = useState('');
-  const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('editor');
-  const [generalAccessRole, setGeneralAccessRole] = useState<'editor' | 'viewer'>('viewer');
+  const [emailInput, setEmailInput] = useState("");
+  const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
+  const [generalAccessRole, setGeneralAccessRole] = useState<
+    "editor" | "viewer"
+  >("viewer");
   const [copiedLink, setCopiedLink] = useState(false);
   const [customToken, setCustomToken] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -33,21 +35,22 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
 
   if (!isOpen) return null;
 
-  const inviteUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/invite/${linkToken}?role=${generalAccessRole}`
-    : `https://splitest.app/invite/${linkToken}`;
+  const inviteUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/invite/${linkToken}?role=${generalAccessRole}`
+      : `https://splitest.thenicedev.xyz/invite/${linkToken}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
-    showToast('Invite link copied to clipboard');
+    showToast("Invite link copied to clipboard");
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleResetLink = () => {
     const newToken = `invite-${activeGroup.id}-${Date.now().toString(36)}`;
     setCustomToken(newToken);
-    showToast('New invite link generated');
+    showToast("New invite link generated");
   };
 
   const handleSendInvite = (e: React.FormEvent) => {
@@ -56,8 +59,10 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
     setIsSending(true);
     setTimeout(() => {
       setIsSending(false);
-      showToast(`Invitation sent to ${emailInput} (${inviteRole === 'editor' ? 'Can edit' : 'Can view'})`);
-      setEmailInput('');
+      showToast(
+        `Invitation sent to ${emailInput} (${inviteRole === "editor" ? "Can edit" : "Can view"})`,
+      );
+      setEmailInput("");
     }, 400);
   };
 
@@ -66,8 +71,12 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
       <div className="bg-white dark:bg-[#0F172A] w-full max-w-lg rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Share &quot;{activeGroup.name}&quot;</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manage member access and sharing link</p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              Share &quot;{activeGroup.name}&quot;
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Manage member access and sharing link
+            </p>
           </div>
           <button
             type="button"
@@ -80,7 +89,9 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
 
         <div className="p-6 space-y-6 overflow-y-auto thin-scrollbar">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Invite by email</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              Invite by email
+            </label>
             <form onSubmit={handleSendInvite} className="flex gap-2">
               <div className="relative flex-1">
                 <input
@@ -96,12 +107,24 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
               <div className="relative">
                 <select
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as 'editor' | 'viewer')}
+                  onChange={(e) =>
+                    setInviteRole(e.target.value as "editor" | "viewer")
+                  }
                   aria-label="Select invite permission"
                   className="h-11 px-3.5 pr-8 rounded-2xl bg-[#F1F5F9] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 appearance-none focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981]"
                 >
-                  <option value="editor" className="dark:bg-[#1E293B] dark:text-slate-200">Can edit</option>
-                  <option value="viewer" className="dark:bg-[#1E293B] dark:text-slate-200">Can view</option>
+                  <option
+                    value="editor"
+                    className="dark:bg-[#1E293B] dark:text-slate-200"
+                  >
+                    Can edit
+                  </option>
+                  <option
+                    value="viewer"
+                    className="dark:bg-[#1E293B] dark:text-slate-200"
+                  >
+                    Can view
+                  </option>
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute right-2.5 top-3.5 pointer-events-none" />
               </div>
@@ -123,20 +146,36 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
                   <LinkIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">General access</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Anyone with this link</p>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    General access
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Anyone with this link
+                  </p>
                 </div>
               </div>
 
               <div className="relative">
                 <select
                   value={generalAccessRole}
-                  onChange={(e) => setGeneralAccessRole(e.target.value as 'editor' | 'viewer')}
+                  onChange={(e) =>
+                    setGeneralAccessRole(e.target.value as "editor" | "viewer")
+                  }
                   aria-label="Select general access permission"
                   className="h-8 px-3 pr-7 rounded-full bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 appearance-none focus:outline-none"
                 >
-                  <option value="viewer" className="dark:bg-[#0F172A] dark:text-slate-200">Can view</option>
-                  <option value="editor" className="dark:bg-[#0F172A] dark:text-slate-200">Can edit</option>
+                  <option
+                    value="viewer"
+                    className="dark:bg-[#0F172A] dark:text-slate-200"
+                  >
+                    Can view
+                  </option>
+                  <option
+                    value="editor"
+                    className="dark:bg-[#0F172A] dark:text-slate-200"
+                  >
+                    Can edit
+                  </option>
                 </select>
                 <ChevronDown className="w-3 h-3 text-slate-500 dark:text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
               </div>
@@ -152,8 +191,12 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
                 onClick={handleCopyLink}
                 className="h-9 px-4 rounded-full bg-[#059669] text-white text-xs font-semibold flex items-center gap-1.5 hover:bg-[#047857] transition-all shrink-0 active:scale-95"
               >
-                {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedLink ? 'Copied' : 'Copy'}
+                {copiedLink ? (
+                  <Check className="w-3.5 h-3.5" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+                {copiedLink ? "Copied" : "Copy"}
               </button>
 
               <button
@@ -176,7 +219,10 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
 
             <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-52 overflow-y-auto thin-scrollbar pr-1">
               {activeGroup.members.map((member) => (
-                <div key={member.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div
+                  key={member.id}
+                  className="py-2.5 flex items-center justify-between gap-3"
+                >
                   <div className="flex items-center gap-3">
                     <img
                       src={member.avatarUrl}
@@ -185,19 +231,24 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
                     />
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">{member.name}</span>
+                        <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                          {member.name}
+                        </span>
                         {member.isCurrentUser && (
                           <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full font-medium">
                             You
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] text-slate-400 dark:text-slate-500">{member.email || `${member.name.toLowerCase().replace(' ', '.')}@example.com`}</span>
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                        {member.email ||
+                          `${member.name.toLowerCase().replace(" ", ".")}@example.com`}
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {member.role === 'owner' ? (
+                    {member.role === "owner" ? (
                       <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full flex items-center gap-1">
                         <Shield className="w-3 h-3 text-[#059669] dark:text-[#34D399]" />
                         Owner
@@ -208,9 +259,24 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
                         aria-label={`Select role for ${member.name}`}
                         className="h-8 px-2.5 pr-6 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none"
                       >
-                        <option value="editor" className="dark:bg-[#1E293B] dark:text-slate-200">Editor</option>
-                        <option value="viewer" className="dark:bg-[#1E293B] dark:text-slate-200">Viewer</option>
-                        <option value="remove" className="dark:bg-[#1E293B] dark:text-slate-200">Remove</option>
+                        <option
+                          value="editor"
+                          className="dark:bg-[#1E293B] dark:text-slate-200"
+                        >
+                          Editor
+                        </option>
+                        <option
+                          value="viewer"
+                          className="dark:bg-[#1E293B] dark:text-slate-200"
+                        >
+                          Viewer
+                        </option>
+                        <option
+                          value="remove"
+                          className="dark:bg-[#1E293B] dark:text-slate-200"
+                        >
+                          Remove
+                        </option>
                       </select>
                     )}
                   </div>

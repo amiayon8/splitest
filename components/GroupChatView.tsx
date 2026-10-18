@@ -573,7 +573,7 @@ export function GroupChatView() {
     if (!text) return null;
     const tokens = text.split(/(@[a-zA-Z0-9._-]+)(?=\s|$|[.,!?])/g);
     return (
-      <span className="whitespace-pre-wrap break-words leading-relaxed text-[13px] sm:text-sm">
+      <span className="whitespace-pre-wrap wrap-break-word leading-relaxed text-[13px] sm:text-sm">
         {tokens.map((token, index) => {
           if (token.startsWith("@")) {
             const raw = token.slice(1).trim().toLowerCase();
@@ -624,7 +624,7 @@ export function GroupChatView() {
       <aside
         className={`${
           isMobileInboxView ? "flex" : "hidden md:flex"
-        } w-full md:w-[320px] lg:w-[360px] shrink-0 border-r border-slate-200/80 dark:border-neutral-800 flex-col bg-white dark:bg-[#000000] z-20`}
+        } w-full md:w-[320px] lg:w-90 shrink-0 border-r border-slate-200/80 dark:border-neutral-800 flex-col bg-white dark:bg-[#000000] z-20`}
       >
         <div className="h-16 px-4 flex items-center justify-between border-b border-slate-100 dark:border-neutral-800">
           <div className="flex items-center gap-2 min-w-0">
@@ -639,7 +639,7 @@ export function GroupChatView() {
             title="New message"
             aria-label="New message"
           >
-            <SquarePen className="w-5 h-5 stroke-[2]" />
+            <SquarePen className="w-5 h-5 stroke-2" />
           </button>
         </div>
 
@@ -864,15 +864,15 @@ export function GroupChatView() {
                       onDoubleClick={() => toggleChatMessageLike(msg.id)}
                       className={`relative px-4 py-2.5 transition-all text-sm select-text ${
                         isMe
-                          ? "bg-[#059669] text-white rounded-[20px] rounded-br-[4px]"
-                          : "bg-[#EFEFEF] dark:bg-[#262626] text-slate-900 dark:text-slate-100 rounded-[20px] rounded-bl-[4px]"
+                          ? "bg-[#059669] text-white rounded-[20px] rounded-br-sm"
+                          : "bg-[#EFEFEF] dark:bg-[#262626] text-slate-900 dark:text-slate-100 rounded-[20px] rounded-bl-sm"
                       }`}
                     >
                       {msg.content && renderMessageContent(msg.content)}
 
                       {msg.attachment && (
                         <div
-                          className={`mt-2 pt-2 border-t w-full min-w-[220px] ${
+                          className={`mt-2 pt-2 border-t w-full min-w-55 ${
                             isMe
                               ? "border-emerald-600 text-white"
                               : "border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-slate-100"
@@ -1323,7 +1323,7 @@ export function GroupChatView() {
                     ? "Search friends..."
                     : "Add more..."
                 }
-                className="flex-1 min-w-[140px] bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none py-1"
+                className="flex-1 min-w-35 bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none py-1"
               />
             </div>
 
@@ -1359,7 +1359,7 @@ export function GroupChatView() {
                   setSearchFriendsModalMode(null);
                   setIsAddFriendModalOpen(true);
                 }}
-                className="text-primary hover:underline lowercase font-semibold normal-case tracking-normal flex items-center gap-1"
+                className="text-primary hover:underline lowercase font-semibold tracking-normal flex items-center gap-1"
               >
                 <UserPlus className="w-3 h-3" />
                 Add via username/link
@@ -1429,7 +1429,7 @@ export function GroupChatView() {
                               : "border-slate-300 dark:border-neutral-600 bg-transparent"
                           }`}
                         >
-                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                          {isSelected && <Check className="w-3 h-3 stroke-3" />}
                         </div>
                       )}
                     </button>

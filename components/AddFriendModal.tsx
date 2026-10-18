@@ -76,7 +76,7 @@ export function AddFriendModal() {
         className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-4 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <UserPlus className="w-5 h-5" />
@@ -96,7 +96,7 @@ export function AddFriendModal() {
           </button>
         </div>
 
-        <div className="mb-4 flex-shrink-0">
+        <div className="mb-4 shrink-0">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
               <Search className="w-4 h-4" />
@@ -138,10 +138,10 @@ export function AddFriendModal() {
         </div>
 
         {matchedUser && (
-          <div className="mb-4 p-3.5 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20 flex-shrink-0 animate-scale-in">
+          <div className="mb-4 p-3.5 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20 shrink-0 animate-scale-in">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="relative w-11 h-11 rounded-full overflow-hidden border border-primary/30 flex-shrink-0 bg-slate-200 dark:bg-slate-700">
+                <div className="relative w-11 h-11 rounded-full overflow-hidden border border-primary/30 shrink-0 bg-slate-200 dark:bg-slate-700">
                   {matchedUser.avatarUrl ? (
                     <Image
                       src={matchedUser.avatarUrl}
@@ -209,7 +209,7 @@ export function AddFriendModal() {
                   className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-200 dark:bg-slate-700">
+                    <div className="relative w-9 h-9 rounded-full overflow-hidden shrink-0 bg-slate-200 dark:bg-slate-700">
                       {user.avatarUrl ? (
                         <Image
                           src={user.avatarUrl}
@@ -257,7 +257,7 @@ export function AddFriendModal() {
           </div>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0 text-xs text-slate-500">
+        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 text-xs text-slate-500">
           <span className="flex items-center gap-1">
             <LinkIcon className="w-3.5 h-3.5" />
             Share links format: /u/username

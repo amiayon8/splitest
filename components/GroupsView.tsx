@@ -284,7 +284,7 @@ export function GroupsView() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-primary/10 border border-primary/20 dark:border-primary/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="p-4 rounded-3xl bg-linear-to-r from-emerald-500/10 via-teal-500/10 to-primary/10 border border-primary/20 dark:border-primary/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-primary tracking-wide uppercase">

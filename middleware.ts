@@ -16,9 +16,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const allCookies = request.cookies.getAll();
   const hasSession =
+    request.cookies.has('splitest_session') ||
     request.cookies.has('sb-access-token') ||
-    request.cookies.has('splitest_session');
+    allCookies.some(
+      (cookie) =>
+        cookie.name.startsWith('sb-') &&
+        (cookie.name.includes('-auth-token') ||
+          cookie.name.includes('-access-token') ||
+          cookie.name.endsWith('-token'))
+    );
 
   if (pathname === '/login') {
     if (hasSession && !searchParams.has('force')) {

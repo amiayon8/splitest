@@ -1,22 +1,13 @@
 import { Suspense } from "react";
 import ProfileClient from "./ProfileClient";
-import { PRESET_USERS_DIRECTORY } from "@/lib/users-directory";
-
-export function generateStaticParams() {
-  return PRESET_USERS_DIRECTORY.map((user) => ({
-    username: user.username,
-  }));
-}
 
 interface SharedProfilePageProps {
   params: Promise<{ username: string }>;
 }
 
-export default async function SharedProfilePage({
+export default function SharedProfilePage({
   params,
 }: SharedProfilePageProps) {
-  const { username } = await params;
-
   return (
     <Suspense
       fallback={
@@ -25,7 +16,16 @@ export default async function SharedProfilePage({
         </div>
       }
     >
-      <ProfileClient username={username} />
+      <ProfileLoader params={params} />
     </Suspense>
   );
+}
+
+async function ProfileLoader({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
+  const { username } = await params;
+  return <ProfileClient username={username} />;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Group,
   GroupMember,
@@ -13,14 +13,12 @@ import {
   ThemeMode,
   FriendContact,
 } from '@/types';
-import { initialGroups, initialExpenses, initialSettlements } from '@/lib/initial-data';
-import { getSupabaseClient, saveSupabaseConfig, isSupabaseConfigured } from '@/lib/supabase';
-import { findUserByUsername, PRESET_USERS_DIRECTORY } from '@/lib/users-directory';
+import { getSupabaseClient, saveSupabaseConfig } from '@/lib/supabase';
+import { findUserByUsername } from '@/lib/users-directory';
 import {
   cacheItems,
   getCachedItems,
   setCachedItem,
-  deleteCachedItem,
   queueMutation,
   getPendingMutations,
   removePendingMutation,
@@ -28,7 +26,7 @@ import {
   useOnlineStatus,
   QueuedMutation,
 } from '@/lib/offlineQueue';
-import { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 interface SplitestContextType {
   groups: Group[];
@@ -145,16 +143,16 @@ const STORAGE_FRIENDS_KEY = 'splitest_local_friends';
 
 const initialProfile: UserProfile = {
   id: 'usr-current',
-  username: 'you.splitest',
-  email: 'you@example.com',
-  fullName: 'Your Name',
+  username: '',
+  email: '',
+  fullName: '',
   avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   defaultCurrency: 'USD',
-  phone: '+1 (555) 019-2834',
-  paymentHandle: 'you.splitest',
+  phone: '',
+  paymentHandle: '',
   themePreference: 'system',
-  googleConnected: true,
-  googleEmail: 'you@gmail.com',
+  googleConnected: false,
+  googleEmail: '',
   notificationsEnabled: true,
   notifyOnExpense: true,
   notifyOnSettlement: true,
@@ -162,99 +160,40 @@ const initialProfile: UserProfile = {
   notifyWeeklyDigest: false,
 };
 
-const initialChatMessages: GroupChatMessage[] = [
-  {
-    id: 'chat-1',
-    groupId: 'group-bali-retreat',
-    senderName: 'Alex Rivera',
-    senderAvatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-    senderIsCurrentUser: false,
-    content: 'Welcome everyone to the Bali Villa retreat ledger! Keep receipts here.',
-    mentions: [],
-    createdAt: '2026-10-17T10:00:00.000Z',
-  },
-  {
-    id: 'chat-2',
-    groupId: 'group-bali-retreat',
-    senderName: 'Liam Vance',
-    senderAvatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
-    senderIsCurrentUser: false,
-    content: 'I booked the private airport transfer for all of us.',
-    mentions: [],
-    attachment: {
-      type: 'expense',
-      referenceId: 'exp-villa-deposit',
-      title: 'Airport Transfer Shuttle',
-      amount: 85.0,
-      currencyCode: 'USD',
-      payerName: 'Liam Vance',
-    },
-    createdAt: '2026-10-17T11:15:00.000Z',
-  },
-  {
-    id: 'chat-3',
-    groupId: 'group-bali-retreat',
-    senderName: 'Sophia Taylor',
-    senderAvatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    senderIsCurrentUser: false,
-    content: 'Thanks Liam! @You could you settle the villa groceries whenever ready?',
-    mentions: ['You'],
-    attachment: {
-      type: 'borrow_request',
-      title: 'Villa Groceries Reimbursement',
-      amount: 45.0,
-      currencyCode: 'USD',
-      recipientName: 'Sophia Taylor',
-    },
-    createdAt: '2026-10-18T08:30:00.000Z',
-  },
-];
-
-const defaultActivities: ActivityFeedItem[] = [
-  {
-    id: 'act-1',
-    type: 'expense_created',
-    title: 'You added Private Pool Villa Deposit',
-    subtitle: 'Today at 2:45 PM • $540.00',
-    timestamp: '2026-10-18T14:45:00.000Z',
-    iconName: 'receipt',
-    iconColorClass: 'text-primary',
-  },
-  {
-    id: 'act-2',
-    type: 'expense_created',
-    title: 'Alex Rivera added Jimbaran Sunset Seafood Dinner',
-    subtitle: 'Yesterday at 7:15 PM • $154.00',
-    timestamp: '2026-10-17T19:15:00.000Z',
-    iconName: 'restaurant',
-    iconColorClass: 'text-secondary',
-  },
-  {
-    id: 'act-3',
-    type: 'settlement_recorded',
-    title: 'Liam Vance settled with Sophia Taylor',
-    subtitle: 'Oct 16 at 11:20 AM • $48.00',
-    timestamp: '2026-10-16T11:20:00.000Z',
-    iconName: 'handshake',
-    iconColorClass: 'text-primary',
-  },
-];
+const fallbackEmptyGroup: Group = {
+  id: '',
+  name: 'No Groups',
+  icon: 'Users',
+  category: 'General',
+  description: '',
+  defaultCurrency: 'USD',
+  simplifyDebts: true,
+  userRole: 'owner',
+  createdAt: '',
+  members: [],
+};
 
 export function SplitestProvider({ children }: { children: React.ReactNode }) {
   const isOnline = useOnlineStatus();
+  const isFetchingRef = useRef(false);
 
   const [groups, setGroups] = useState<Group[]>(() => {
-    if (typeof window === 'undefined') return initialGroups;
+    if (typeof window === 'undefined') return [];
     try {
       const stored = window.localStorage.getItem(STORAGE_GROUPS_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && !parsed.some((g: Group) => g.id === 'group-bali-retreat')) {
+          return parsed;
+        }
+      }
     } catch {
-      return initialGroups;
+      return [];
     }
-    return initialGroups;
+    return [];
   });
 
-  const [activeGroupId, setActiveGroupId] = useState<string>('group-bali-retreat');
+  const [activeGroupId, setActiveGroupId] = useState<string>('');
   const [currentView, setCurrentView] = useState<'wallet' | 'expenses' | 'groups' | 'analytics' | 'profile' | 'chat'>('wallet');
 
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -282,43 +221,59 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [allChatMessages, setAllChatMessages] = useState<GroupChatMessage[]>(() => {
-    if (typeof window === 'undefined') return initialChatMessages;
+    if (typeof window === 'undefined') return [];
     try {
       const stored = window.localStorage.getItem(STORAGE_CHAT_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && !parsed.some((c: GroupChatMessage) => c.id === 'chat-1')) {
+          return parsed;
+        }
+      }
     } catch {
-      return initialChatMessages;
+      return [];
     }
-    return initialChatMessages;
+    return [];
   });
 
   const chatMessages = useMemo(() => {
+    if (!activeGroupId) return [];
     return allChatMessages.filter((msg) => msg.groupId === activeGroupId);
   }, [allChatMessages, activeGroupId]);
 
   const [allExpenses, setAllExpenses] = useState<Expense[]>(() => {
-    if (typeof window === 'undefined') return initialExpenses;
+    if (typeof window === 'undefined') return [];
     try {
       const stored = window.localStorage.getItem(STORAGE_EXPENSES_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && !parsed.some((e: Expense) => e.id === 'exp-villa-deposit')) {
+          return parsed;
+        }
+      }
     } catch {
-      return initialExpenses;
+      return [];
     }
-    return initialExpenses;
+    return [];
   });
 
   const [allSettlements, setAllSettlements] = useState<Settlement[]>(() => {
-    if (typeof window === 'undefined') return initialSettlements;
+    if (typeof window === 'undefined') return [];
     try {
       const stored = window.localStorage.getItem(STORAGE_SETTLEMENTS_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && !parsed.some((s: Settlement) => s.id === 'settle-1')) {
+          return parsed;
+        }
+      }
     } catch {
-      return initialSettlements;
+      return [];
     }
-    return initialSettlements;
+    return [];
   });
 
-  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>('exp-villa-deposit');
+  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
   const [simplifyDebts, setSimplifyDebts] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -350,14 +305,14 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [activities, setActivities] = useState<ActivityFeedItem[]>(() => {
-    if (typeof window === 'undefined') return defaultActivities;
+    if (typeof window === 'undefined') return [];
     try {
       const stored = window.localStorage.getItem(STORAGE_ACTIVITIES_KEY);
       if (stored) return JSON.parse(stored);
     } catch {
-      return defaultActivities;
+      return [];
     }
-    return defaultActivities;
+    return [];
   });
 
   const showToast = useCallback((message: string) => {
@@ -387,6 +342,22 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     void refreshPendingCount();
   }, [refreshPendingCount]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const rawGroups = window.localStorage.getItem(STORAGE_GROUPS_KEY);
+      if (rawGroups && rawGroups.includes('group-bali-retreat')) {
+        window.localStorage.removeItem(STORAGE_GROUPS_KEY);
+        window.localStorage.removeItem(STORAGE_EXPENSES_KEY);
+        window.localStorage.removeItem(STORAGE_SETTLEMENTS_KEY);
+        window.localStorage.removeItem(STORAGE_CHAT_KEY);
+        window.localStorage.removeItem(STORAGE_ACTIVITIES_KEY);
+      }
+    } catch {
+      return;
+    }
+  }, []);
+
   const saveToLocalStorage = useCallback(
     (
       newExpenses: Expense[],
@@ -413,96 +384,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       if (newChat) void cacheItems('chat_messages', newChat);
       if (newFriends) void cacheItems('friends', newFriends);
       if (newProfile) void setCachedItem('profiles', newProfile);
-    },
-    []
-  );
-
-  const seedInitialDataToSupabase = useCallback(
-    async (client: SupabaseClient) => {
-      try {
-        for (const group of initialGroups) {
-          await client.from('groups').upsert({
-            id: group.id,
-            name: group.name,
-            icon: group.icon,
-            category: group.category,
-            description: group.description,
-            default_currency: group.defaultCurrency,
-            simplify_debts: group.simplifyDebts,
-            user_role: group.userRole,
-            created_at: group.createdAt,
-          });
-
-          const membersToInsert = group.members.map((m) => ({
-            id: m.id,
-            group_id: group.id,
-            name: m.name,
-            email: m.email,
-            avatar_url: m.avatarUrl,
-            role: m.role,
-            is_current_user: m.isCurrentUser,
-          }));
-          await client.from('group_members').upsert(membersToInsert);
-        }
-
-        for (const exp of initialExpenses) {
-          await client.from('expenses').upsert({
-            id: exp.id,
-            group_id: exp.groupId,
-            description: exp.description,
-            category: exp.category,
-            amount: exp.amount,
-            currency_code: exp.currencyCode,
-            exchange_rate_to_group: exp.exchangeRateToGroup,
-            paid_by_name: exp.paidByName,
-            split_method: exp.splitMethod,
-            date: exp.date,
-            has_receipt: exp.hasReceipt,
-            created_at: exp.createdAt,
-          });
-
-          const splitsToInsert = exp.splits.map((s) => ({
-            id: s.id,
-            expense_id: exp.id,
-            member_name: s.memberName,
-            share_amount: s.shareAmount,
-            percentage: s.percentage || null,
-            shares: s.shares || null,
-          }));
-          await client.from('expense_splits').upsert(splitsToInsert);
-        }
-
-        for (const set of initialSettlements) {
-          await client.from('settlements').upsert({
-            id: set.id,
-            group_id: set.groupId,
-            payer_name: set.payerName,
-            recipient_name: set.recipientName,
-            amount: set.amount,
-            currency_code: set.currencyCode,
-            method: set.method,
-            notes: set.notes || '',
-            created_at: set.createdAt,
-          });
-        }
-
-        for (const chat of initialChatMessages) {
-          await client.from('chat_messages').upsert({
-            id: chat.id,
-            group_id: chat.groupId,
-            sender_name: chat.senderName,
-            sender_avatar_url: chat.senderAvatarUrl,
-            sender_is_current_user: chat.senderIsCurrentUser,
-            content: chat.content,
-            mentions: chat.mentions || [],
-            attachment: chat.attachment || null,
-            likes: chat.likes || [],
-            created_at: chat.createdAt,
-          });
-        }
-      } catch {
-        return;
-      }
     },
     []
   );
@@ -720,13 +601,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     try {
       setSupabaseStatus('connecting');
 
-      const synced = await processOfflineQueue(client);
-      if (synced > 0) {
-        showToast(`Synced ${synced} offline changes with cloud database`);
-      }
+      await processOfflineQueue(client);
 
       const [
         groupsResponse,
@@ -751,9 +632,12 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       if (groupsResponse.error) throw groupsResponse.error;
 
       if (!groupsResponse.data || groupsResponse.data.length === 0) {
-        await seedInitialDataToSupabase(client);
+        setGroups([]);
+        setAllExpenses([]);
+        setAllSettlements([]);
+        setAllChatMessages([]);
+        setCustomFriends([]);
         setSupabaseStatus('connected');
-        showToast('Initialized cloud database with ledger data');
         return;
       }
 
@@ -860,40 +744,31 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       setGroups(builtGroups);
       setAllExpenses(builtExpenses);
       setAllSettlements(builtSettlements);
-      if (builtChatMessages.length > 0) {
-        setAllChatMessages(builtChatMessages);
-      }
-      if (builtFriends.length > 0) {
-        setCustomFriends(builtFriends);
-      }
+      setAllChatMessages(builtChatMessages);
+      setCustomFriends(builtFriends);
       setSupabaseStatus('connected');
 
       saveToLocalStorage(
-        builtGroups.length > 0 ? builtExpenses : allExpenses,
+        builtExpenses,
         builtSettlements,
         builtGroups,
-        activities,
-        builtChatMessages.length > 0 ? builtChatMessages : allChatMessages,
-        builtFriends.length > 0 ? builtFriends : customFriends
+        [],
+        builtChatMessages,
+        builtFriends
       );
     } catch {
       setSupabaseStatus('error');
+    } finally {
+      isFetchingRef.current = false;
     }
-  }, [
-    isOnline,
-    processOfflineQueue,
-    showToast,
-    seedInitialDataToSupabase,
-    saveToLocalStorage,
-    allExpenses,
-    activities,
-    allChatMessages,
-    customFriends,
-  ]);
+  }, [isOnline, processOfflineQueue, saveToLocalStorage]);
+
+  const fetchSupabaseDataRef = useRef(fetchSupabaseData);
+  fetchSupabaseDataRef.current = fetchSupabaseData;
 
   const syncNow = useCallback(async () => {
-    await fetchSupabaseData();
-  }, [fetchSupabaseData]);
+    await fetchSupabaseDataRef.current();
+  }, []);
 
   useEffect(() => {
     if (!isOnline) {
@@ -907,8 +782,28 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    void fetchSupabaseData();
-  }, [isOnline, fetchSupabaseData]);
+    void fetchSupabaseDataRef.current();
+  }, [isOnline]);
+
+  useEffect(() => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        document.cookie = "splitest_session=; path=/; max-age=0";
+        window.location.href = "/login";
+      } else if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
+        document.cookie = `splitest_session=authenticated; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     async function loadOfflineCachedData() {
@@ -970,71 +865,41 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     const client = getSupabaseClient();
     if (!client || !isOnline) return;
 
-    let groupChannel: RealtimeChannel | null = null;
-    let expenseChannel: RealtimeChannel | null = null;
-    let settlementChannel: RealtimeChannel | null = null;
-    let commentsChannel: RealtimeChannel | null = null;
-    let chatChannel: RealtimeChannel | null = null;
-    let friendsChannel: RealtimeChannel | null = null;
+    let debounceTimer: NodeJS.Timeout | null = null;
+    const triggerDebouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void fetchSupabaseDataRef.current();
+      }, 400);
+    };
 
-    try {
-      groupChannel = client
-        .channel('public:groups')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
-          void fetchSupabaseData();
-        })
-        .subscribe();
-
-      expenseChannel = client
-        .channel('public:expenses')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => {
-          void fetchSupabaseData();
-        })
-        .subscribe();
-
-      settlementChannel = client
-        .channel('public:settlements')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'settlements' }, () => {
-          void fetchSupabaseData();
-        })
-        .subscribe();
-
-      commentsChannel = client
-        .channel('public:comments')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => {
-          void fetchSupabaseData();
-        })
-        .subscribe();
-
-      chatChannel = client
-        .channel('public:chat_messages')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => {
-          void fetchSupabaseData();
-        })
-        .subscribe();
-
-      friendsChannel = client
-        .channel('public:friends')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'friends' }, () => {
-          void fetchSupabaseData();
-        })
-        .subscribe();
-    } catch {
-      return;
-    }
+    const channel = client
+      .channel('public-db-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expense_splits' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settlements' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, triggerDebouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friends' }, triggerDebouncedFetch)
+      .subscribe();
 
     return () => {
-      if (groupChannel) client.removeChannel(groupChannel);
-      if (expenseChannel) client.removeChannel(expenseChannel);
-      if (settlementChannel) client.removeChannel(settlementChannel);
-      if (commentsChannel) client.removeChannel(commentsChannel);
-      if (chatChannel) client.removeChannel(chatChannel);
-      if (friendsChannel) client.removeChannel(friendsChannel);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      client.removeChannel(channel);
     };
-  }, [isOnline, fetchSupabaseData]);
+  }, [isOnline]);
+
+  useEffect(() => {
+    if (groups.length > 0 && (!activeGroupId || !groups.some((g) => g.id === activeGroupId))) {
+      setActiveGroupId(groups[0].id);
+    }
+  }, [groups, activeGroupId]);
 
   const activeGroup = useMemo(() => {
-    return groups.find((item) => item.id === activeGroupId) || groups[0];
+    if (groups.length === 0) return fallbackEmptyGroup;
+    return groups.find((item) => item.id === activeGroupId) || groups[0] || fallbackEmptyGroup;
   }, [groups, activeGroupId]);
 
   const activeCurrency = useMemo(() => {
@@ -1048,10 +913,12 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   }, [activeGroup]);
 
   const expenses = useMemo(() => {
+    if (!activeGroupId) return [];
     return allExpenses.filter((item) => item.groupId === activeGroupId);
   }, [allExpenses, activeGroupId]);
 
   const settlements = useMemo(() => {
+    if (!activeGroupId) return [];
     return allSettlements.filter((item) => item.groupId === activeGroupId);
   }, [allSettlements, activeGroupId]);
 
@@ -1506,7 +1373,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
   const setActiveCurrency = useCallback(
     (currency: string) => {
-      if (activeGroup) {
+      if (activeGroup && activeGroup.id) {
         void updateGroup(activeGroup.id, { defaultCurrency: currency });
       }
     },
@@ -1517,16 +1384,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     async (url: string, anonKey: string) => {
       if (!url.trim() || !anonKey.trim()) return false;
       saveSupabaseConfig({ url: url.trim(), anonKey: anonKey.trim() });
-      await fetchSupabaseData();
+      await fetchSupabaseDataRef.current();
       return true;
     },
-    [fetchSupabaseData]
+    []
   );
 
   const clearSupabaseCredentials = useCallback(() => {
     saveSupabaseConfig(null);
     setSupabaseStatus('simulated');
-    showToast('Reverted to local realtime mode');
+    showToast('Reverted to local mode');
   }, [showToast]);
 
   const sendPaymentReminders = useCallback(() => {
@@ -1534,7 +1401,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   }, [showToast]);
 
   const exportGroupCsv = useCallback(() => {
-    if (!activeGroup) return;
+    if (!activeGroup || !activeGroup.id) return;
     const rows = [
       ['Date', 'Description', 'Category', 'Paid By', 'Amount', 'Currency', 'Split Method'],
       ...expenses.map((e) => [
@@ -1551,7 +1418,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${activeGroup.name.toLowerCase().replace(/\s+/g, '_')}_expenses.csv`);
+    link.setAttribute('download', `${(activeGroup.name || 'group').toLowerCase().replace(/\s+/g, '_')}_expenses.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1645,7 +1512,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       if (Notification.permission === 'granted') {
         try {
           new Notification('Splitest Notification', {
-            body: `${activeGroup.name}: Alex Rivera recorded an expense for $45.00`,
+            body: `${activeGroup.name || 'Splitest'}: Activity recorded in ledger`,
             icon: '/Splitest.svg',
           });
           showToast('Notification sent');
@@ -1656,7 +1523,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    showToast(`Test notification sent: ${activeGroup.name}`);
+    showToast(`Test notification sent`);
     return true;
   }, [activeGroup.name, showToast]);
 
@@ -1957,10 +1824,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   const allFriendsList = useMemo<FriendContact[]>(() => {
     const friendMap = new Map<string, FriendContact>();
 
-    PRESET_USERS_DIRECTORY.forEach((preset) => {
-      friendMap.set(preset.username.toLowerCase(), preset);
-    });
-
     groups.forEach((group) => {
       group.members.forEach((member) => {
         if (!member.isCurrentUser) {
@@ -2038,7 +1901,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
   const addFriendByUsername = useCallback(
     (query: string) => {
-      const match = findUserByUsername(query);
+      const match = findUserByUsername(query, allFriendsList);
       if (!match) {
         return {
           success: false,

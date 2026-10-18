@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSplitest } from "@/lib/store";
+import { getSupabaseClient } from "@/lib/supabase";
 import {
   Search,
   Users,
@@ -288,9 +289,18 @@ export function Header() {
                 <div className="pt-1 px-1.5">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
+                      const supabase = getSupabaseClient();
+                      if (supabase) {
+                        try {
+                          await supabase.auth.signOut();
+                        } catch {
+                          // ignore
+                        }
+                      }
                       document.cookie = "splitest_session=; path=/; max-age=0";
                       router.push("/login");
+                      router.refresh();
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-left"
                   >

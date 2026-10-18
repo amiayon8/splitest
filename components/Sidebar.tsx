@@ -72,7 +72,7 @@ export function Sidebar() {
   ] as const;
 
   return (
-    <aside className="fixed left-0 top-16 bottom-0 z-40 bg-white dark:bg-[#0F172A] border-r border-slate-200/80 dark:border-slate-800 flex flex-col select-none transition-colors duration-150 w-20 lg:w-[260px]">
+    <aside className="fixed left-0 top-16 bottom-0 z-40 bg-white dark:bg-[#0F172A] border-r border-slate-200/80 dark:border-slate-800 flex flex-col select-none transition-colors duration-150 w-20 lg:w-65">
       <div className="p-3 lg:p-4">
         {!isViewOnly ? (
           <button

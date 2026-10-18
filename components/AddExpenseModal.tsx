@@ -404,7 +404,7 @@ export function AddExpenseModal() {
                             : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-[#0F172A]'
                         }`}
                       >
-                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-3" />}
                       </div>
                       <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{member.name}</span>
                     </button>
