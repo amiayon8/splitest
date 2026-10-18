@@ -16,6 +16,8 @@ import {
   Receipt,
   MessageSquare,
   SlidersHorizontal,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 
 export function InspectorPane() {
@@ -24,6 +26,9 @@ export function InspectorPane() {
     expenses,
     settlements,
     selectedExpense,
+    setSelectedExpenseId,
+    setEditingExpense,
+    deleteExpense,
     simplifyDebts,
     activeInspectorTab,
     setActiveInspectorTab,
@@ -428,6 +433,31 @@ export function InspectorPane() {
                 <Send className="w-3.5 h-3.5" />
               </button>
             </div>
+
+            {!isViewOnly && (
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingExpense(selectedExpense)}
+                  className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await deleteExpense(selectedExpense.id);
+                    setSelectedExpenseId(null);
+                    showToast(`Deleted "${selectedExpense.description}"`);
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/70 text-[#E11D48] dark:text-[#FB7185] text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

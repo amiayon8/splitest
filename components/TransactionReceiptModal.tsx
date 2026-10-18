@@ -9,6 +9,7 @@ import {
   X,
   Send,
   Trash2,
+  Pencil,
   MessageSquare,
   Palmtree,
   Utensils,
@@ -33,11 +34,13 @@ export function TransactionReceiptModal() {
     selectedExpense,
     selectedExpenseId,
     setSelectedExpenseId,
+    setEditingExpense,
     deleteExpense,
     addComment,
     isViewOnly,
     activeCurrency,
     showToast,
+    currentView,
   } = useSplitest();
 
   const [commentText, setCommentText] = useState("");
@@ -63,9 +66,10 @@ export function TransactionReceiptModal() {
   };
 
   const IconComp = CATEGORY_ICONS[selectedExpense.category] || Tag;
+  const isDesktopWallet = currentView === "wallet";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 xl:hidden select-none">
+    <div className={`fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 select-none ${isDesktopWallet ? "xl:hidden" : ""}`}>
       <div className="bg-white dark:bg-[#0F172A] w-full max-w-lg rounded-3xl shadow-xl p-6 flex flex-col gap-5 border border-slate-200/80 dark:border-slate-800 max-h-[90vh] overflow-y-auto thin-scrollbar">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -214,7 +218,18 @@ export function TransactionReceiptModal() {
         </div>
 
         {!isViewOnly && (
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEditingExpense(selectedExpense);
+                setSelectedExpenseId(null);
+              }}
+              className="px-4 py-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit Expense
+            </button>
             <button
               type="button"
               onClick={handleDelete}

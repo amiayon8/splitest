@@ -13,6 +13,7 @@ import { ProfileView } from "@/components/ProfileView";
 import { GroupChatView } from "@/components/GroupChatView";
 import { TransactionReceiptModal } from "@/components/TransactionReceiptModal";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
+import { EditExpenseModal } from "@/components/EditExpenseModal";
 import { SettleModal } from "@/components/SettleModal";
 import { ShareGroupModal } from "@/components/ShareGroupModal";
 import { CreateGroupModal } from "@/components/CreateGroupModal";
@@ -50,6 +51,7 @@ export default function HomePage() {
 
       <TransactionReceiptModal />
       <AddExpenseModal />
+      <EditExpenseModal />
       <SettleModal />
       <ShareGroupModal
         isOpen={isShareModalOpen}

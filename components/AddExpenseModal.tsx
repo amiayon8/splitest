@@ -3,18 +3,16 @@
 import React, { useState, useMemo } from 'react';
 import { useSplitest } from '@/lib/store';
 import { Expense } from '@/types';
-import { SUPPORTED_CURRENCIES, getExchangeRate } from '@/lib/currency';
+import { getCurrencyInfo } from '@/lib/currency';
 import { serializeToUtc } from '@/lib/timezone';
 import {
   X,
-  ChevronDown,
   Check,
   Receipt,
   Equal,
   DollarSign,
   Percent,
   Layers,
-  ArrowRightLeft,
 } from 'lucide-react';
 
 export function AddExpenseModal() {
@@ -28,9 +26,6 @@ export function AddExpenseModal() {
 
   const [description, setDescription] = useState('');
   const [amountInput, setAmountInput] = useState('');
-  const [currencyCode, setCurrencyCode] = useState(() => activeGroup.defaultCurrency || 'USD');
-  const [customRate, setCustomRate] = useState<string>('');
-  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [category, setCategory] = useState<Expense['category']>('dining');
   const [paidBy, setPaidBy] = useState('You');
   const [splitMethod, setSplitMethod] = useState<Expense['splitMethod']>('equal');
@@ -43,23 +38,12 @@ export function AddExpenseModal() {
   const [shares, setShares] = useState<Record<string, number>>({});
 
   const groupBaseCurrency = activeGroup.defaultCurrency || 'USD';
-  const isDifferentCurrency = currencyCode !== groupBaseCurrency;
-
-  const effectiveExchangeRate = useMemo(() => {
-    if (!isDifferentCurrency) return 1.0;
-    const parsedCustom = parseFloat(customRate);
-    if (!isNaN(parsedCustom) && parsedCustom > 0) return parsedCustom;
-    return getExchangeRate(currencyCode, groupBaseCurrency);
-  }, [currencyCode, groupBaseCurrency, isDifferentCurrency, customRate]);
+  const groupCurrencyInfo = useMemo(() => getCurrencyInfo(groupBaseCurrency), [groupBaseCurrency]);
 
   const parsedTotalAmount = useMemo(() => {
     const parsed = parseFloat(amountInput);
     return isNaN(parsed) || parsed < 0 ? 0 : parsed;
   }, [amountInput]);
-
-  const baseConvertedAmount = useMemo(() => {
-    return Math.round(parsedTotalAmount * effectiveExchangeRate * 100) / 100;
-  }, [parsedTotalAmount, effectiveExchangeRate]);
 
   const activeMembersList = useMemo(() => {
     const groupMemberNames = activeGroup.members.map((m) => m.name);
@@ -184,8 +168,8 @@ export function AddExpenseModal() {
       groupId: activeGroup.id,
       description: description.trim(),
       amount: parsedTotalAmount,
-      currencyCode,
-      exchangeRateToGroup: effectiveExchangeRate,
+      currencyCode: groupBaseCurrency,
+      exchangeRateToGroup: 1.0,
       category,
       paidByName: paidBy,
       splitMethod,
@@ -232,77 +216,27 @@ export function AddExpenseModal() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Amount & Currency</label>
-            <div className="flex gap-2">
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
-                  className="h-12 px-3.5 rounded-2xl bg-[#F1F5F9] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 hover:bg-slate-200/70 dark:hover:bg-slate-700/70"
-                >
-                  <span>{currencyCode}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                </button>
-
-                {isCurrencyOpen && (
-                  <div className="absolute left-0 mt-1 w-44 bg-white dark:bg-[#1E293B] rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl py-1 z-50">
-                    <div className="max-h-52 overflow-y-auto thin-scrollbar">
-                      {SUPPORTED_CURRENCIES.map((curr) => (
-                        <button
-                          key={curr.code}
-                          type="button"
-                          onClick={() => {
-                            setCurrencyCode(curr.code);
-                            setIsCurrencyOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 ${
-                            currencyCode === curr.code ? 'font-bold text-[#059669] dark:text-[#34D399] bg-[#D1FAE5]/30 dark:bg-[#064E3B]/30' : 'text-slate-700 dark:text-slate-200'
-                          }`}
-                        >
-                          <span>{curr.code} ({curr.symbol})</span>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">{curr.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative flex-1">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={amountInput}
-                  onChange={(e) => setAmountInput(e.target.value)}
-                  placeholder="0.00"
-                  required
-                  className="w-full h-12 px-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-base font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981] tabular-nums"
-                />
-              </div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              Amount ({groupBaseCurrency})
+            </label>
+            <div className="relative flex items-center">
+              <span className="absolute left-4 text-sm font-bold text-slate-400 dark:text-slate-500 pointer-events-none select-none">
+                {groupCurrencyInfo.symbol}
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                placeholder="0.00"
+                required
+                className="w-full h-12 pl-9 pr-16 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-base font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981] tabular-nums"
+              />
+              <span className="absolute right-4 text-xs font-bold text-slate-500 dark:text-slate-400 pointer-events-none select-none uppercase">
+                {groupBaseCurrency}
+              </span>
             </div>
-
-            {isDifferentCurrency && (
-              <div className="mt-2 p-3 bg-[#F1F5F9] dark:bg-[#1E293B] rounded-2xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <ArrowRightLeft className="w-3.5 h-3.5 text-[#059669] dark:text-[#34D399]" />
-                  <span className="text-slate-600 dark:text-slate-300">
-                    Converts to <strong className="text-slate-800 dark:text-slate-100">${baseConvertedAmount.toFixed(2)} {groupBaseCurrency}</strong>
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500">Rate:</span>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    placeholder={effectiveExchangeRate.toFixed(4)}
-                    value={customRate}
-                    onChange={(e) => setCustomRate(e.target.value)}
-                    className="w-20 h-7 px-2 text-xs rounded-lg bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 text-right font-mono text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -375,7 +309,7 @@ export function AddExpenseModal() {
               <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Split amongst members</span>
               {splitMethod === 'exact' && (
                 <span className={`text-xs font-semibold tabular-nums ${Math.abs(remainingBalance) < 0.02 ? 'text-[#059669] dark:text-[#34D399]' : 'text-[#E11D48] dark:text-[#FB7185]'}`}>
-                  {remainingBalance === 0 ? 'Fully allocated' : `$${remainingBalance.toFixed(2)} remaining`}
+                  {remainingBalance === 0 ? 'Fully allocated' : `${groupCurrencyInfo.symbol}${remainingBalance.toFixed(2)} remaining`}
                 </span>
               )}
             </div>
@@ -411,7 +345,7 @@ export function AddExpenseModal() {
 
                     {splitMethod === 'exact' && isSelected && (
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-slate-400 dark:text-slate-500">$</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500">{groupCurrencyInfo.symbol}</span>
                         <input
                           type="number"
                           step="0.01"
@@ -459,7 +393,7 @@ export function AddExpenseModal() {
 
                     {splitMethod === 'equal' && isSelected && splitItem && (
                       <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 tabular-nums">
-                        ${splitItem.shareAmount.toFixed(2)}
+                        {groupCurrencyInfo.symbol}{splitItem.shareAmount.toFixed(2)}
                       </span>
                     )}
                   </div>

@@ -16,6 +16,7 @@ import {
 import { getSupabaseClient, saveSupabaseConfig } from '@/lib/supabase';
 import { findUserByUsername, fetchUserProfileFromDatabase } from '@/lib/users-directory';
 import { getGravatarUrl, isGoogleAvatarUrl } from '@/lib/avatar';
+import { formatCurrency } from '@/lib/currency';
 import {
   cacheItems,
   getCachedItems,
@@ -102,6 +103,20 @@ interface SplitestContextType {
     splits: { memberName: string; shareAmount: number; percentage?: number; shares?: number }[];
   }) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+  updateExpense: (
+    id: string,
+    expenseData: {
+      description: string;
+      amount: number;
+      category: Expense['category'];
+      paidByName: string;
+      splitMethod: Expense['splitMethod'];
+      hasReceipt: boolean;
+      splits: { memberName: string; shareAmount: number; percentage?: number; shares?: number }[];
+    }
+  ) => Promise<void>;
+  editingExpense: Expense | null;
+  setEditingExpense: (expense: Expense | null) => void;
   addSettlement: (settlementData: {
     groupId: string;
     payerName: string;
@@ -286,6 +301,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState<boolean>(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isSettleModalOpen, setIsSettleModalOpen] = useState<boolean>(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isLedgerSettingsModalOpen, setIsLedgerSettingsModalOpen] = useState<boolean>(false);
@@ -423,6 +439,35 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
                 shares: s.shares || null,
               }));
               await client.from('expense_splits').upsert(splitsPayload);
+            }
+            return true;
+          }
+          case 'update_expense': {
+            const exp = mutation.payload as unknown as Expense;
+            const { error: expError } = await client
+              .from('expenses')
+              .update({
+                description: exp.description,
+                amount: exp.amount,
+                category: exp.category,
+                paid_by_name: exp.paidByName,
+                split_method: exp.splitMethod,
+                has_receipt: exp.hasReceipt,
+              })
+              .eq('id', exp.id);
+            if (expError) return false;
+
+            await client.from('expense_splits').delete().eq('expense_id', exp.id);
+            if (exp.splits && exp.splits.length > 0) {
+              const splitsPayload = exp.splits.map((s) => ({
+                id: s.id,
+                expense_id: exp.id,
+                member_name: s.memberName,
+                share_amount: s.shareAmount,
+                percentage: s.percentage || null,
+                shares: s.shares || null,
+              }));
+              await client.from('expense_splits').insert(splitsPayload);
             }
             return true;
           }
@@ -953,6 +998,9 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           setAllExpenses((prev) => [payload as Expense, ...prev]);
         } else if (type === 'expense_deleted') {
           setAllExpenses((prev) => prev.filter((item) => item.id !== payload));
+        } else if (type === 'expense_updated') {
+          const updated = payload as Expense;
+          setAllExpenses((prev) => prev.map((exp) => (exp.id === updated.id ? updated : exp)));
         } else if (type === 'settlement_added') {
           setAllSettlements((prev) => [payload as Settlement, ...prev]);
         } else if (type === 'comment_added') {
@@ -1059,13 +1107,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const newId = `exp-${Date.now()}`;
       const nowIso = new Date().toISOString();
 
+      const targetGroup = groups.find((g) => g.id === expenseData.groupId);
+      const groupCurrency = targetGroup?.defaultCurrency || 'USD';
+
       const newExpense: Expense = {
         id: newId,
         groupId: expenseData.groupId,
         description: expenseData.description,
         amount: Number(expenseData.amount),
-        currencyCode: expenseData.currencyCode || 'USD',
-        exchangeRateToGroup: expenseData.exchangeRateToGroup || 1.0,
+        currencyCode: groupCurrency,
+        exchangeRateToGroup: 1.0,
         category: expenseData.category,
         paidByName: expenseData.paidByName,
         splitMethod: expenseData.splitMethod,
@@ -1087,7 +1138,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         id: `act-${Date.now()}`,
         type: 'expense_created',
         title: `${expenseData.paidByName === 'You' ? 'You' : expenseData.paidByName} added ${expenseData.description}`,
-        subtitle: `Just now • $${Number(expenseData.amount).toFixed(2)}`,
+        subtitle: `Just now • ${formatCurrency(Number(expenseData.amount), groupCurrency)}`,
         timestamp: nowIso,
         iconName: 'receipt',
         iconColorClass: 'text-primary',
@@ -1193,6 +1244,107 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     [
       allExpenses,
       selectedExpenseId,
+      allSettlements,
+      groups,
+      activities,
+      isOnline,
+      saveToLocalStorage,
+      broadcastLocalEvent,
+      refreshPendingCount,
+      showToast,
+    ]
+  );
+
+  const updateExpense = useCallback(
+    async (
+      id: string,
+      expenseData: {
+        description: string;
+        amount: number;
+        category: Expense['category'];
+        paidByName: string;
+        splitMethod: Expense['splitMethod'];
+        hasReceipt: boolean;
+        splits: { memberName: string; shareAmount: number; percentage?: number; shares?: number }[];
+      }
+    ) => {
+      const existing = allExpenses.find((exp) => exp.id === id);
+      if (!existing) return;
+
+      const targetGroup = groups.find((g) => g.id === existing.groupId);
+      const groupCurrency = targetGroup?.defaultCurrency || existing.currencyCode || 'USD';
+
+      const updatedExpense: Expense = {
+        ...existing,
+        description: expenseData.description,
+        amount: Number(expenseData.amount),
+        currencyCode: groupCurrency,
+        exchangeRateToGroup: 1.0,
+        category: expenseData.category,
+        paidByName: expenseData.paidByName,
+        splitMethod: expenseData.splitMethod,
+        hasReceipt: expenseData.hasReceipt,
+        splits: expenseData.splits.map((split, index) => ({
+          id: `split-${id}-${index}`,
+          expenseId: id,
+          memberName: split.memberName,
+          shareAmount: Number(split.shareAmount),
+          percentage: split.percentage,
+          shares: split.shares,
+        })),
+      };
+
+      const updatedExpenses = allExpenses.map((exp) => (exp.id === id ? updatedExpense : exp));
+      setAllExpenses(updatedExpenses);
+      saveToLocalStorage(updatedExpenses, allSettlements, groups, activities);
+      broadcastLocalEvent('expense_updated', updatedExpense);
+
+      const client = getSupabaseClient();
+      if (client && isOnline) {
+        try {
+          const { error: expError } = await client
+            .from('expenses')
+            .update({
+              description: updatedExpense.description,
+              amount: updatedExpense.amount,
+              category: updatedExpense.category,
+              paid_by_name: updatedExpense.paidByName,
+              split_method: updatedExpense.splitMethod,
+              has_receipt: updatedExpense.hasReceipt,
+            })
+            .eq('id', id);
+
+          if (!expError) {
+            await client.from('expense_splits').delete().eq('expense_id', id);
+            if (updatedExpense.splits && updatedExpense.splits.length > 0) {
+              const splitsPayload = updatedExpense.splits.map((s) => ({
+                id: s.id,
+                expense_id: id,
+                member_name: s.memberName,
+                share_amount: s.shareAmount,
+                percentage: s.percentage || null,
+                shares: s.shares || null,
+              }));
+              await client.from('expense_splits').insert(splitsPayload);
+            }
+            showToast('Expense updated in database');
+            return;
+          }
+        } catch {
+        }
+      }
+
+      await queueMutation({
+        id: `mut-${Date.now()}`,
+        type: 'update_expense',
+        payload: updatedExpense as unknown as Record<string, unknown>,
+        timestamp: new Date().toISOString(),
+      });
+      await refreshPendingCount();
+      showToast('Expense updated locally • Will sync when connected');
+    },
+    [
+      allExpenses,
       allSettlements,
       groups,
       activities,
@@ -2087,6 +2239,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       setIsConfigModalOpen,
       isAddExpenseModalOpen,
       setIsAddExpenseModalOpen,
+      editingExpense,
+      setEditingExpense,
       isSettleModalOpen,
       setIsSettleModalOpen,
       isShareModalOpen,
@@ -2113,6 +2267,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       addFriendDirectly,
       addFriendByUsername,
       addExpense,
+      updateExpense,
       deleteExpense,
       addSettlement,
       addComment,
@@ -2159,6 +2314,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       syncNow,
       isConfigModalOpen,
       isAddExpenseModalOpen,
+      editingExpense,
       isSettleModalOpen,
       isShareModalOpen,
       isLedgerSettingsModalOpen,
@@ -2175,6 +2331,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       addFriendDirectly,
       addFriendByUsername,
       addExpense,
+      updateExpense,
       deleteExpense,
       addSettlement,
       addComment,

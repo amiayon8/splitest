@@ -9,6 +9,7 @@ export interface QueuedMutation {
   id: string;
   type:
     | 'create_expense'
+    | 'update_expense'
     | 'delete_expense'
     | 'record_settlement'
     | 'create_group'
