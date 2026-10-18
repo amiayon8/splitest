@@ -67,7 +67,7 @@ export function calculateSimplifiedDebts(
     if (rounded < -0.01) {
       debtors.push({ name: member.memberName, balance: Math.abs(rounded) });
     } else if (rounded > 0.01) {
-      creditors.push({ name: member.memberName, balance: });
+      creditors.push({ name: member.memberName, balance: rounded });
     }
   }
 
