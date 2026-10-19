@@ -124,17 +124,17 @@ export function findUserByUsername(
 
   const exactMatch = combined.find(
     (u) =>
-      u.username.toLowerCase() === normalized ||
+      (u.username || "").toLowerCase() === normalized ||
       (u.email ? u.email.toLowerCase() === normalized : false) ||
-      u.name.toLowerCase() === normalized,
+      (u.name || "").toLowerCase() === normalized,
   );
 
   if (exactMatch) return exactMatch;
 
   const partialMatch = combined.find(
     (u) =>
-      u.username.toLowerCase().includes(normalized) ||
-      u.name.toLowerCase().includes(normalized),
+      (u.username || "").toLowerCase().includes(normalized) ||
+      (u.name || "").toLowerCase().includes(normalized),
   );
 
   return partialMatch || null;

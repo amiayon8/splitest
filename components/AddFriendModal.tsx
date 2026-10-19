@@ -74,15 +74,22 @@ export function AddFriendModal() {
   const suggestedMembers = useMemo(() => {
     const list: PublicUserProfile[] = [];
     const seen = new Set<string>();
-    groups.forEach((g) => {
-      g.members.forEach((m) => {
-        if (!m.isCurrentUser && !isMemberCurrentUser(m.name, g, userProfile)) {
-          const username = m.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
-          if (!seen.has(username) && !allFriendsList.some((f) => f.username.toLowerCase() === username)) {
+    (groups || []).forEach((g) => {
+      (g?.members || []).forEach((m) => {
+        if (!m) return;
+        const memberName = m.name || m.username || (m.email ? m.email.split('@')[0] : '') || '';
+        if (!m.isCurrentUser && !isMemberCurrentUser(memberName, g, userProfile)) {
+          const username = (
+            m.username ||
+            memberName.toLowerCase().replace(/[^a-z0-9]/g, '.') ||
+            (m.email ? m.email.split('@')[0].replace(/[^a-z0-9]/g, '.') : '') ||
+            'user'
+          ).toLowerCase();
+          if (!seen.has(username) && !allFriendsList.some((f) => (f.username || '').toLowerCase() === username)) {
             seen.add(username);
             list.push({
-              id: m.id,
-              name: m.name,
+              id: m.id || `member-${username}`,
+              name: memberName || username,
               username,
               avatarUrl: m.avatarUrl || '',
               email: m.email || '',
@@ -100,7 +107,9 @@ export function AddFriendModal() {
   if (!isAddFriendModalOpen) return null;
 
   const isAlreadyFriend = (username: string) => {
-    return allFriendsList.some((item) => item.username.toLowerCase() === username.toLowerCase());
+    if (!username) return false;
+    const cleanUsername = username.toLowerCase();
+    return allFriendsList.some((item) => (item.username || '').toLowerCase() === cleanUsername);
   };
 
   const handleAddMatched = async () => {

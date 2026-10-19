@@ -2760,7 +2760,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           if (friendTargetName && memberName && memberName === friendTargetName) return true;
           return false;
         });
-        return hasFriend || g.name.trim().toLowerCase() === friendTargetName;
+        return hasFriend || (Boolean(friendTargetName) && (g.name || '').trim().toLowerCase() === friendTargetName);
       });
 
       if (existingChat) {
@@ -2864,8 +2864,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const group = groups.find((g) => g.id === groupId);
       if (!group) return;
 
-      const existingNames = new Set(group.members.map((m) => m.name.toLowerCase()));
-      const toAdd = newMemberNames.filter((name) => !existingNames.has(name.toLowerCase()));
+      const existingNames = new Set((group.members || []).map((m) => (m.name || '').toLowerCase()));
+      const toAdd = newMemberNames.filter((name) => !existingNames.has((name || '').toLowerCase()));
       if (toAdd.length === 0) return;
 
       const newMembers: GroupMember[] = toAdd.map((name, index) => {
@@ -3132,19 +3132,25 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     const userFullName = (userProfile.fullName || '').trim().toLowerCase();
     const userHandle = (userProfile.username || '').trim().toLowerCase();
 
-    groups.forEach((group) => {
-      group.members.forEach((member) => {
+    (groups || []).forEach((group) => {
+      (group?.members || []).forEach((member) => {
+        if (!member) return;
         const mEmail = (member.email || '').trim().toLowerCase();
-        const mName = (member.name || '').trim().toLowerCase();
+        const rawName = (member.name || member.username || (mEmail ? mEmail.split('@')[0] : '') || 'friend').trim();
+        const mNameLower = rawName.toLowerCase();
         const isSelf =
           member.isCurrentUser ||
           (Boolean(userEmail) && Boolean(mEmail) && mEmail === userEmail) ||
-          (Boolean(userFullName) && mName === userFullName) ||
-          (Boolean(userHandle) && mName === userHandle) ||
-          mName === 'you';
+          (Boolean(userFullName) && mNameLower === userFullName) ||
+          (Boolean(userHandle) && mNameLower === userHandle) ||
+          mNameLower === 'you';
         if (isSelf) return;
 
-        const generatedUsername = member.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+        const generatedUsername = (
+          member.username ||
+          rawName.toLowerCase().replace(/[^a-z0-9]/g, '.') ||
+          'friend'
+        ).toLowerCase();
         const existing = friendMap.get(generatedUsername);
         if (existing) {
           friendMap.set(generatedUsername, {
@@ -3153,8 +3159,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           });
         } else {
           friendMap.set(generatedUsername, {
-            id: member.id,
-            name: member.name,
+            id: member.id || `member-${generatedUsername}`,
+            name: member.name || rawName,
             username: generatedUsername,
             avatarUrl: member.avatarUrl || '',
             email: member.email || '',
@@ -3164,11 +3170,17 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       });
     });
 
-    customFriends.forEach((friend) => {
-      const fUsername = (friend.username || '').toLowerCase();
+    (customFriends || []).forEach((friend) => {
+      if (!friend) return;
+      const fUsername = (
+        friend.username ||
+        (friend.name ? friend.name.toLowerCase().replace(/[^a-z0-9]/g, '.') : '') ||
+        (friend.email ? friend.email.split('@')[0].replace(/[^a-z0-9]/g, '.') : '')
+      ).toLowerCase();
+      const fEmail = (friend.email || '').trim().toLowerCase();
       const isSelf =
         (Boolean(userHandle) && fUsername === userHandle) ||
-        (Boolean(userEmail) && friend.email && friend.email.toLowerCase() === userEmail);
+        (Boolean(userEmail) && Boolean(fEmail) && fEmail === userEmail);
       if (!isSelf && fUsername) {
         friendMap.set(fUsername, friend);
       }
@@ -3179,7 +3191,12 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
   const addFriendDirectly = useCallback(
     async (friend: FriendContact) => {
-      const friendUsername = friend.username || friend.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+      const rawFriendName = (friend.name || friend.username || (friend.email ? friend.email.split('@')[0] : '') || 'friend').trim();
+      const friendUsername = (
+        friend.username ||
+        rawFriendName.toLowerCase().replace(/[^a-z0-9]/g, '.') ||
+        'friend'
+      ).toLowerCase();
       const currentUserEmail = (userProfile.email || '').trim().toLowerCase();
       const friendEmail = (
         friend.email ||
@@ -3190,7 +3207,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const friendContact: FriendContact = {
         ...friend,
         username: friendUsername,
-        name: friend.name || friendUsername,
+        name: friend.name || rawFriendName,
         avatarUrl: friend.avatarUrl || '',
         email: friendEmail,
       };
@@ -3200,7 +3217,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           (item) =>
             (item.email && friendContact.email && item.email.toLowerCase() === friendContact.email.toLowerCase()) ||
             (item.username && friendContact.username && item.username.toLowerCase() === friendContact.username.toLowerCase()) ||
-            item.name.toLowerCase() === friendContact.name.toLowerCase()
+            (item.name && friendContact.name && item.name.toLowerCase() === friendContact.name.toLowerCase())
         );
         if (exists) return prev;
         const updated = [friendContact, ...prev];
@@ -3262,15 +3279,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           message: 'No user found with that username or profile link.',
         };
       }
-      const currentUsername = userProfile.username || '';
-      if (currentUsername && match.username.toLowerCase() === currentUsername.toLowerCase()) {
+      const currentUsername = (userProfile.username || '').toLowerCase();
+      const matchUsername = (match.username || '').toLowerCase();
+      if (currentUsername && matchUsername && matchUsername === currentUsername) {
         return {
           success: false,
           message: 'You cannot add yourself as a friend.',
         };
       }
       const alreadyExists = allFriendsList.some(
-        (item) => item.username.toLowerCase() === match!.username.toLowerCase()
+        (item) => (item.username || '').toLowerCase() === matchUsername
       );
       if (alreadyExists) {
         return {

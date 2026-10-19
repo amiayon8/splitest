@@ -267,7 +267,7 @@ export function getCurrentUserMemberName(
   });
   if (matchByFlag) return matchByFlag.name;
 
-  const matchYou = group.members.find((m) => m.name.trim().toLowerCase() === 'you');
+  const matchYou = group.members.find((m) => (m.name || '').trim().toLowerCase() === 'you');
   if (matchYou) return matchYou.name;
 
   return userProfile?.fullName || userProfile?.username || group.members[0]?.name || 'You';
@@ -328,7 +328,7 @@ export function isMemberCurrentUser(
 
     if (email && group?.members) {
       const match = group.members.find(
-        (m) => m.name.trim().toLowerCase() === cleanTarget
+        (m) => (m.name || '').trim().toLowerCase() === cleanTarget
       );
       if (match?.email && match.email.trim().toLowerCase() === email) {
         return true;
