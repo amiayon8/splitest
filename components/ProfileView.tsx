@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSplitest } from "@/lib/store";
-import { buildProfileShareUrl } from "@/lib/users-directory";
+import {
+  buildProfileShareUrl,
+  validateUsernameFormat,
+  checkUsernameAvailability,
+} from "@/lib/users-directory";
 import { getGravatarUrl, isGoogleAvatarUrl, isGravatarUrl } from "@/lib/avatar";
 import {
   User,
@@ -12,6 +16,8 @@ import {
   Globe,
   Bell,
   CheckCircle2,
+  XCircle,
+  AlertCircle,
   Save,
   Send,
   Sun,
@@ -61,6 +67,48 @@ export function ProfileView() {
   );
 
   const [isSendingTest, setIsSendingTest] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<{
+    state: "idle" | "checking" | "available" | "error";
+    message?: string;
+  }>({ state: "idle" });
+
+  useEffect(() => {
+    const cleaned = username.trim().toLowerCase();
+    if (!cleaned) {
+      setUsernameStatus({ state: "idle" });
+      return;
+    }
+
+    if (cleaned === (userProfile.username || "").toLowerCase()) {
+      setUsernameStatus({ state: "available", message: "Your current username" });
+      return;
+    }
+
+    const formatCheck = validateUsernameFormat(cleaned);
+    if (!formatCheck.valid) {
+      setUsernameStatus({ state: "error", message: formatCheck.error });
+      return;
+    }
+
+    setUsernameStatus({ state: "checking", message: "Checking availability..." });
+    let isCancelled = false;
+
+    const timer = setTimeout(async () => {
+      const result = await checkUsernameAvailability(cleaned, userProfile.id);
+      if (isCancelled) return;
+      if (result.available) {
+        setUsernameStatus({ state: "available", message: `@${cleaned} is available` });
+      } else {
+        setUsernameStatus({ state: "error", message: result.error || "Username is taken" });
+      }
+    }, 350);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [username, userProfile.username, userProfile.id]);
 
   const currentProfileUrl = buildProfileShareUrl(
     username || (userProfile.fullName ? userProfile.fullName.toLowerCase().replace(/[^a-z0-9]/g, ".") : "user")
@@ -87,15 +135,21 @@ export function ProfileView() {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (usernameStatus.state === "error") {
+      showToast(usernameStatus.message || "Please choose a valid available username");
+      return;
+    }
+
+    setIsSaving(true);
     const resolvedAvatar =
       avatarUrl ||
       (isGoogleActive ? googlePhotoUrl : "") ||
       gravatarPreviewUrl ||
       "";
 
-    updateUserProfile({
+    const result = await updateUserProfile({
       fullName,
       username: username.trim().toLowerCase(),
       email,
@@ -108,6 +162,14 @@ export function ProfileView() {
       notifyOnMention,
       notifyWeeklyDigest,
     });
+
+    setIsSaving(false);
+    if (result && !result.success) {
+      showToast(result.error || "Failed to update profile");
+      return;
+    }
+
+    showToast("Profile and username updated");
   };
 
   const handleTestNotification = async () => {
@@ -131,10 +193,15 @@ export function ProfileView() {
         <button
           type="button"
           onClick={handleSave}
-          className="flex items-center gap-2 px-5 py-2 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
+          disabled={isSaving || usernameStatus.state === "checking" || usernameStatus.state === "error"}
+          className="flex items-center gap-2 px-5 py-2 rounded-full bg-[#059669] hover:bg-[#047857] disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
         >
-          <Save className="w-3.5 h-3.5" />
-          <span>Save Changes</span>
+          {isSaving ? (
+            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Save className="w-3.5 h-3.5" />
+          )}
+          <span>{isSaving ? "Saving..." : "Save Changes"}</span>
         </button>
       </div>
 
@@ -316,10 +383,15 @@ export function ProfileView() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 items-center gap-1.5">
-                <AtSign className="w-3.5 h-3.5 text-slate-400" />
-                Username
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <AtSign className="w-3.5 h-3.5 text-slate-400" />
+                  Username
+                </label>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  Unique handle
+                </span>
+              </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-xs font-mono text-slate-400 pointer-events-none">
                   @
@@ -327,11 +399,42 @@ export function ProfileView() {
                 <input
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))}
                   placeholder="your.username"
-                  className="w-full h-11 pl-8 pr-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-semibold font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669]"
+                  className={`w-full h-11 pl-8 pr-10 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border text-sm font-semibold font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-colors ${
+                    usernameStatus.state === "error"
+                      ? "border-[#E11D48] dark:border-[#F43F5E] focus:border-[#E11D48]"
+                      : usernameStatus.state === "available"
+                      ? "border-[#059669] dark:border-[#10B981] focus:border-[#059669]"
+                      : "border-slate-200 dark:border-slate-700 focus:border-[#059669]"
+                  }`}
                 />
+                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                  {usernameStatus.state === "checking" && (
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {usernameStatus.state === "available" && (
+                    <CheckCircle2 className="w-4 h-4 text-[#059669] dark:text-[#10B981]" />
+                  )}
+                  {usernameStatus.state === "error" && (
+                    <XCircle className="w-4 h-4 text-[#E11D48] dark:text-[#F43F5E]" />
+                  )}
+                </div>
               </div>
+              {usernameStatus.message && (
+                <div
+                  className={`flex items-center gap-1.5 mt-1.5 text-[11px] font-medium ${
+                    usernameStatus.state === "error"
+                      ? "text-[#E11D48] dark:text-[#F43F5E]"
+                      : usernameStatus.state === "available"
+                      ? "text-[#059669] dark:text-[#10B981]"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {usernameStatus.state === "error" && <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+                  <span>{usernameStatus.message}</span>
+                </div>
+              )}
             </div>
 
             <div>
@@ -696,10 +799,15 @@ export function ProfileView() {
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="submit"
-            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
+            disabled={isSaving || usernameStatus.state === "checking" || usernameStatus.state === "error"}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#059669] hover:bg-[#047857] disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
           >
-            <Save className="w-4 h-4" />
-            <span>Save All Preferences</span>
+            {isSaving ? (
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>{isSaving ? "Saving..." : "Save All Preferences"}</span>
           </button>
         </div>
       </form>

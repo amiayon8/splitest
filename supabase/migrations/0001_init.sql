@@ -22,6 +22,8 @@ create table if not exists profiles (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists profiles_username_unique_idx on profiles (lower(username)) where username is not null;
+
 create table if not exists groups (
   id text primary key,
   name text not null,

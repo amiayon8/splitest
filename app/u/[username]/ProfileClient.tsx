@@ -45,7 +45,7 @@ export default function ProfileClient({ username }: ProfileClientProps) {
     let active = true;
     async function loadUser() {
       setIsLoading(true);
-      const localMatch = findUserByUsername(username, allFriendsList);
+      const localMatch = findUserByUsername(username, allFriendsList, userProfile);
       if (localMatch) {
         if (active) {
           setTargetUser(localMatch);
@@ -63,7 +63,11 @@ export default function ProfileClient({ username }: ProfileClientProps) {
     return () => {
       active = false;
     };
-  }, [username, allFriendsList]);
+  }, [username, allFriendsList, userProfile]);
+
+  const isAuthenticated = useMemo(() => {
+    return !!(userProfile.id || userProfile.email);
+  }, [userProfile]);
 
   const isSelf = useMemo(() => {
     if (!targetUser) return false;
@@ -237,9 +241,33 @@ export default function ProfileClient({ username }: ProfileClientProps) {
           </div>
 
           <div className="space-y-2.5">
-            {isSelf ? (
-              <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-center text-xs font-semibold text-slate-600 dark:text-slate-300">
-                This is your public profile link
+            {!isAuthenticated ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/login?next=/u/${encodeURIComponent(username)}`)}
+                  className="w-full h-12 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-98"
+                >
+                  <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                  <span>Connect with {targetUser.name} on Splitest</span>
+                </button>
+              </div>
+            ) : isSelf ? (
+              <div className="space-y-2">
+                <div className="p-3 rounded-2xl bg-[#D1FAE5] dark:bg-[#064E3B]/50 border border-emerald-200 dark:border-emerald-800 text-center text-xs font-bold text-[#065F46] dark:text-[#A7F3D0]">
+                  This is your public profile link
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentView("profile");
+                    router.push("/");
+                  }}
+                  className="w-full h-11 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-98"
+                >
+                  <span>Edit Your Profile</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             ) : isAlreadyFriend || addedSuccess ? (
               <div className="space-y-2">

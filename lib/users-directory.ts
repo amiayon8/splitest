@@ -1,4 +1,4 @@
-import { FriendContact } from "@/types";
+import { FriendContact, UserProfile } from "@/types";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getGravatarUrl } from "@/lib/avatar";
 
@@ -29,12 +29,97 @@ export function normalizeUsernameInput(rawInput: string): string {
   return cleaned.trim();
 }
 
+export function validateUsernameFormat(rawInput: string): { valid: boolean; error?: string } {
+  const cleaned = normalizeUsernameInput(rawInput);
+  if (!cleaned) {
+    return { valid: false, error: "Username is required" };
+  }
+  if (cleaned.length < 3) {
+    return { valid: false, error: "Username must be at least 3 characters" };
+  }
+  if (cleaned.length > 30) {
+    return { valid: false, error: "Username cannot exceed 30 characters" };
+  }
+  if (!/^[a-z0-9._]+$/.test(cleaned)) {
+    return { valid: false, error: "Only letters, numbers, periods, and underscores allowed" };
+  }
+  if (cleaned.startsWith(".") || cleaned.startsWith("_")) {
+    return { valid: false, error: "Username cannot start with a period or underscore" };
+  }
+  if (cleaned.endsWith(".") || cleaned.endsWith("_")) {
+    return { valid: false, error: "Username cannot end with a period or underscore" };
+  }
+  if (cleaned.includes("..")) {
+    return { valid: false, error: "Username cannot contain consecutive periods" };
+  }
+  return { valid: true };
+}
+
+export async function checkUsernameAvailability(
+  rawUsername: string,
+  currentUserId?: string
+): Promise<{ available: boolean; error?: string }> {
+  const formatCheck = validateUsernameFormat(rawUsername);
+  if (!formatCheck.valid) {
+    return { available: false, error: formatCheck.error };
+  }
+
+  const normalized = normalizeUsernameInput(rawUsername);
+  const client = getSupabaseClient();
+  if (!client) {
+    return { available: true };
+  }
+
+  try {
+    let query = client
+      .from("profiles")
+      .select("id, username")
+      .ilike("username", normalized);
+
+    if (currentUserId) {
+      query = query.neq("id", currentUserId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error && error.code !== "PGRST116") {
+      return { available: true };
+    }
+
+    if (data) {
+      return { available: false, error: `@${normalized} is already taken` };
+    }
+
+    return { available: true };
+  } catch {
+    return { available: true };
+  }
+}
+
 export function findUserByUsername(
   rawUsernameOrUrl: string,
   extraUsers: PublicUserProfile[] = [],
+  currentUser?: UserProfile
 ): PublicUserProfile | null {
   const normalized = normalizeUsernameInput(rawUsernameOrUrl);
   if (!normalized) return null;
+
+  if (currentUser) {
+    const userHandle = (currentUser.username || "").toLowerCase();
+    const userEmail = (currentUser.email || "").toLowerCase();
+    const userName = (currentUser.fullName || "").toLowerCase();
+    if (userHandle === normalized || userEmail === normalized || userName === normalized) {
+      return {
+        id: currentUser.id,
+        name: currentUser.fullName,
+        username: currentUser.username || normalized,
+        email: currentUser.email,
+        avatarUrl: currentUser.avatarUrl || (currentUser.email ? getGravatarUrl(currentUser.email) : ""),
+        netBalance: 0,
+        groupCount: 0,
+        addedVia: "link",
+      };
+    }
+  }
 
   const combined = [...PRESET_USERS_DIRECTORY, ...extraUsers];
 
@@ -66,34 +151,62 @@ export async function fetchUserProfileFromDatabase(
   if (!client) return null;
 
   try {
-    const { data } = await client
+    const { data: byUsername } = await client
       .from("profiles")
       .select("*")
-      .or(`username.ilike.${normalized},id.eq.${normalized},email.ilike.${normalized}`)
+      .ilike("username", normalized)
       .maybeSingle();
 
-    if (!data) return null;
+    const record = byUsername || null;
 
-    return {
-      id: data.id,
-      name: data.full_name,
-      username: data.username || normalized,
-      email: data.email || "",
-      avatarUrl: data.avatar_url || (data.email ? getGravatarUrl(data.email) : ""),
-      bio: data.bio || undefined,
-      netBalance: 0,
-      groupCount: 0,
-      addedVia: "directory",
-      memberSince: data.created_at
-        ? new Date(data.created_at).toLocaleDateString(undefined, {
-            month: "short",
-            year: "numeric",
-          })
-        : undefined,
-    };
+    if (!record) {
+      const { data: byId } = await client
+        .from("profiles")
+        .select("*")
+        .eq("id", normalized)
+        .maybeSingle();
+
+      if (byId) {
+        return mapDatabaseProfile(byId, normalized);
+      }
+
+      const { data: byEmail } = await client
+        .from("profiles")
+        .select("*")
+        .ilike("email", normalized)
+        .maybeSingle();
+
+      if (byEmail) {
+        return mapDatabaseProfile(byEmail, normalized);
+      }
+
+      return null;
+    }
+
+    return mapDatabaseProfile(record, normalized);
   } catch {
     return null;
   }
+}
+
+function mapDatabaseProfile(data: Record<string, any>, fallbackUsername: string): PublicUserProfile {
+  return {
+    id: data.id,
+    name: data.full_name || data.username || "User",
+    username: data.username || fallbackUsername,
+    email: data.email || "",
+    avatarUrl: data.avatar_url || (data.email ? getGravatarUrl(data.email) : ""),
+    bio: data.bio || undefined,
+    netBalance: 0,
+    groupCount: 0,
+    addedVia: "directory",
+    memberSince: data.created_at
+      ? new Date(data.created_at).toLocaleDateString(undefined, {
+          month: "short",
+          year: "numeric",
+        })
+      : undefined,
+  };
 }
 
 export function buildProfileShareUrl(username: string): string {

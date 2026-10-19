@@ -14,7 +14,7 @@ import {
   FriendContact,
 } from '@/types';
 import { getSupabaseClient, saveSupabaseConfig } from '@/lib/supabase';
-import { findUserByUsername, fetchUserProfileFromDatabase } from '@/lib/users-directory';
+import { findUserByUsername, fetchUserProfileFromDatabase, validateUsernameFormat } from '@/lib/users-directory';
 import { getGravatarUrl, isGoogleAvatarUrl } from '@/lib/avatar';
 import { formatCurrency } from '@/lib/currency';
 import {
@@ -133,7 +133,7 @@ interface SplitestContextType {
   sendPaymentReminders: () => void;
   exportGroupCsv: () => void;
   userProfile: UserProfile;
-  updateUserProfile: (updates: Partial<UserProfile>) => void;
+  updateUserProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
   syncGoogleAccount: () => Promise<boolean>;
   disconnectGoogleAccount: () => void;
   sendTestNotification: () => Promise<boolean>;
@@ -1693,7 +1693,39 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   }, [activeGroup, expenses, showToast]);
 
   const updateUserProfile = useCallback(
-    async (updates: Partial<UserProfile>) => {
+    async (updates: Partial<UserProfile>): Promise<{ success: boolean; error?: string }> => {
+      const client = getSupabaseClient();
+
+      if (updates.username !== undefined) {
+        const cleanedUsername = updates.username.trim().toLowerCase();
+        if (cleanedUsername) {
+          const validation = validateUsernameFormat(cleanedUsername);
+          if (!validation.valid) {
+            return { success: false, error: validation.error };
+          }
+
+          if (cleanedUsername !== (userProfile.username || '').toLowerCase() && client && isOnline) {
+            try {
+              let query = client
+                .from('profiles')
+                .select('id, username')
+                .ilike('username', cleanedUsername);
+
+              if (userProfile.id) {
+                query = query.neq('id', userProfile.id);
+              }
+
+              const { data: existingUser } = await query.maybeSingle();
+              if (existingUser) {
+                return { success: false, error: `@${cleanedUsername} is already taken by another account` };
+              }
+            } catch {
+            }
+          }
+        }
+        updates.username = cleanedUsername;
+      }
+
       const updated = { ...userProfile, ...updates };
       setUserProfile(updated);
       if (typeof window !== 'undefined') {
@@ -1701,10 +1733,9 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       }
       void setCachedItem('profiles', updated);
 
-      const client = getSupabaseClient();
       if (client && isOnline) {
         try {
-          await client.from('profiles').upsert({
+          const { error } = await client.from('profiles').upsert({
             id: updated.id,
             email: updated.email,
             full_name: updated.fullName,
@@ -1722,9 +1753,15 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             notify_on_mention: updated.notifyOnMention,
             notify_weekly_digest: updated.notifyWeeklyDigest,
           });
-          return;
+
+          if (error) {
+            if (error.code === '23505' || error.message?.toLowerCase().includes('unique')) {
+              return { success: false, error: 'Username is already taken' };
+            }
+          } else {
+            return { success: true };
+          }
         } catch {
-          // fallback
         }
       }
 
@@ -1735,6 +1772,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         timestamp: new Date().toISOString(),
       });
       await refreshPendingCount();
+      return { success: true };
     },
     [userProfile, isOnline, refreshPendingCount]
   );

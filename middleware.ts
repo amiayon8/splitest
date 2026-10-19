@@ -11,6 +11,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/fonts') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/icons') ||
+    pathname.startsWith('/u/') ||
     STATIC_FILE_EXTENSION_REGEX.test(pathname)
   ) {
     return NextResponse.next();
