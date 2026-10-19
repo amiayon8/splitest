@@ -3,7 +3,10 @@
 import React, { useMemo, useState } from "react";
 import { useSplitest } from "@/lib/store";
 import { formatCurrency } from "@/lib/currency";
-import { calculateMemberBalances, getCurrentUserBalance } from "@/lib/split-calculator";
+import {
+  calculateMemberBalances,
+  getCurrentUserBalance,
+} from "@/lib/split-calculator";
 import {
   Users,
   UserCheck,
@@ -58,7 +61,8 @@ export function Sidebar() {
         gExpenses,
         gSettlements,
       );
-      balanceMap[group.id] = getCurrentUserBalance(balances, group, userProfile)?.netBalance || 0;
+      balanceMap[group.id] =
+        getCurrentUserBalance(balances, group, userProfile)?.netBalance || 0;
     }
     return balanceMap;
   }, [groups, allExpenses, allSettlements, userProfile]);
@@ -189,7 +193,7 @@ export function Sidebar() {
           type="button"
           onClick={() => void syncNow()}
           className="w-full h-8 px-2 lg:px-3 rounded-xl flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-          title="Click to sync data with database"
+          title="Click to sync"
         >
           <div className="flex items-center gap-2 min-w-0">
             <span
@@ -197,20 +201,20 @@ export function Sidebar() {
                 isOffline
                   ? "bg-amber-500"
                   : supabaseStatus === "connected"
-                  ? "bg-emerald-500"
-                  : supabaseStatus === "connecting"
-                  ? "bg-sky-500 animate-ping"
-                  : "bg-slate-400"
+                    ? "bg-emerald-500"
+                    : supabaseStatus === "connecting"
+                      ? "bg-sky-500 animate-ping"
+                      : "bg-slate-400"
               }`}
             />
             <span className="hidden lg:inline truncate">
               {isOffline
                 ? "Offline Cache"
                 : supabaseStatus === "connected"
-                ? "Database Synced"
-                : supabaseStatus === "connecting"
-                ? "Connecting..."
-                : "Local Mode"}
+                  ? "Synced"
+                  : supabaseStatus === "connecting"
+                    ? "Connecting..."
+                    : "Local Mode"}
             </span>
           </div>
           {pendingSyncCount > 0 ? (

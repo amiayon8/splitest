@@ -21,7 +21,7 @@ interface ShareGroupModalProps {
 }
 
 export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
-  const { activeGroup, userProfile, showToast } = useSplitest();
+  const { activeGroup, userProfile, showToast, addMemberByEmail } = useSplitest();
 
   const [emailInput, setEmailInput] = useState("");
   const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
@@ -38,12 +38,16 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
     if (!isOpen || !activeGroup?.id) return;
     const client = getSupabaseClient();
     if (client) {
-      void client.from("group_invites").upsert({
-        id: linkToken,
-        group_id: activeGroup.id,
-        role: generalAccessRole,
-        created_by: userProfile.id || null,
-      });
+      void client
+        .from("group_invites")
+        .upsert({
+          id: linkToken,
+          group_id: activeGroup.id,
+          role: generalAccessRole,
+          created_by: userProfile.id || null,
+        })
+        .then(() => {})
+        .catch(() => {});
     }
   }, [isOpen, activeGroup?.id, linkToken, generalAccessRole, userProfile.id]);
 
@@ -57,12 +61,15 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
   const handleCopyLink = async () => {
     const client = getSupabaseClient();
     if (client && activeGroup?.id) {
-      await client.from("group_invites").upsert({
-        id: linkToken,
-        group_id: activeGroup.id,
-        role: generalAccessRole,
-        created_by: userProfile.id || null,
-      });
+      try {
+        await client.from("group_invites").upsert({
+          id: linkToken,
+          group_id: activeGroup.id,
+          role: generalAccessRole,
+          created_by: userProfile.id || null,
+        });
+      } catch {
+      }
     }
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
@@ -75,27 +82,35 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
     setCustomToken(newToken);
     const client = getSupabaseClient();
     if (client && activeGroup?.id) {
-      await client.from("group_invites").upsert({
-        id: newToken,
-        group_id: activeGroup.id,
-        role: generalAccessRole,
-        created_by: userProfile.id || null,
-      });
+      try {
+        await client.from("group_invites").upsert({
+          id: newToken,
+          group_id: activeGroup.id,
+          role: generalAccessRole,
+          created_by: userProfile.id || null,
+        });
+      } catch {
+      }
     }
     showToast("New invite link generated");
   };
 
-  const handleSendInvite = (e: React.FormEvent) => {
+  const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput.trim()) return;
+    const email = emailInput.trim();
+    if (!email || !activeGroup) return;
+
     setIsSending(true);
-    setTimeout(() => {
+    try {
+      const res = await addMemberByEmail(activeGroup.id, email, inviteRole);
+      if (res.success) {
+        setEmailInput("");
+      }
+    } catch {
+      showToast("Could not add member by email");
+    } finally {
       setIsSending(false);
-      showToast(
-        `Invitation sent to ${emailInput} (${inviteRole === "editor" ? "Can edit" : "Can view"})`,
-      );
-      setEmailInput("");
-    }, 400);
+    }
   };
 
   return (

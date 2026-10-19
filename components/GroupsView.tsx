@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/currency';
 import { calculateMemberBalances, getCurrentUserBalance, getCurrentUserMemberName } from '@/lib/split-calculator';
 import { WalletCardDeck } from '@/components/WalletCardDeck';
 import { buildProfileShareUrl } from '@/lib/users-directory';
+import { getGravatarUrl } from '@/lib/avatar';
 import {
   Plus,
   ArrowRight,
@@ -92,24 +93,46 @@ export function GroupsView() {
       }
     }
 
+    const myUsername = userProfile.username ? userProfile.username.toLowerCase() : "";
+    const myFullName = userProfile.fullName ? userProfile.fullName.toLowerCase() : "";
+    const myEmail = userProfile.email ? userProfile.email.toLowerCase() : "";
+
     allFriendsList.forEach((friend) => {
-      const existing = friendsMap.get(friend.name.toLowerCase());
+      const friendKey = (friend.username || friend.name || '').toLowerCase();
+      if (!friendKey) return;
+
+      const friendUsername = friend.username ? friend.username.toLowerCase() : "";
+      const friendName = friend.name ? friend.name.toLowerCase() : "";
+      const friendEmail = friend.email ? friend.email.toLowerCase() : "";
+
+      const isMe =
+        (Boolean(myUsername) && Boolean(friendUsername) && friendUsername === myUsername) ||
+        (Boolean(myFullName) && Boolean(friendName) && friendName === myFullName) ||
+        (Boolean(myEmail) && Boolean(friendEmail) && friendEmail === myEmail);
+      if (isMe) return;
+
+      const existingByName = friendsMap.get((friend.name || '').toLowerCase());
+      const existingByKey = friendsMap.get(friendKey);
+      const existing = existingByKey || existingByName;
+
       if (existing) {
-        existing.username = friend.username;
+        if (friend.username) existing.username = friend.username;
         if (friend.avatarUrl) existing.avatarUrl = friend.avatarUrl;
+        if (friend.name && !existing.name) existing.name = friend.name;
+        if (friend.groupCount) existing.groupCount = Math.max(existing.groupCount, friend.groupCount);
       } else {
-        friendsMap.set(friend.name.toLowerCase(), {
-          name: friend.name,
+        friendsMap.set(friendKey, {
+          name: friend.name || friend.username || 'Friend',
           username: friend.username,
-          avatarUrl: friend.avatarUrl || '',
-          netBalance: 0,
+          avatarUrl: friend.avatarUrl || (friend.email ? getGravatarUrl(friend.email) : ''),
+          netBalance: friend.netBalance || 0,
           groupCount: friend.groupCount || 0,
         });
       }
     });
 
     return Array.from(friendsMap.values());
-  }, [groups, allExpenses, allSettlements, allFriendsList]);
+  }, [groups, allExpenses, allSettlements, allFriendsList, userProfile]);
 
   const currentUsername =
     userProfile.username ||

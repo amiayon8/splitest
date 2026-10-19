@@ -143,6 +143,7 @@ interface SplitestContextType {
   sendChatMessage: (data: { groupId: string; content: string; mentions?: string[]; attachment?: ChatAttachment }) => void;
   createGroupFromChat: (name: string, category: string, memberNames: string[]) => string;
   addMembersToGroup: (groupId: string, newMemberNames: string[]) => void;
+  addMemberByEmail: (groupId: string, email: string, role?: 'owner' | 'editor' | 'viewer') => Promise<{ success: boolean; message: string; member?: GroupMember }>;
   toggleChatMessageLike: (messageId: string) => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
@@ -771,7 +772,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const [createdGroupsRes, allMembersRes, userFriendsRes] = await Promise.all([
         client.from('groups').select('*').eq('created_by', authUser.id),
         client.from('group_members').select('*'),
-        client.from('friends').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false }),
+        client.from('friends').select('*').or(`phone.eq.${authUser.id},phone.is.null`).order('created_at', { ascending: false }),
       ]);
 
       const rawMembers = allMembersRes.data || [];
@@ -782,10 +783,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       rawMembers.forEach((m) => {
         const mEmail = (m.email || '').trim().toLowerCase();
         const mName = (m.name || '').trim().toLowerCase();
-        const mUserId = m.user_id;
 
         if (
-          (mUserId && mUserId === authUser.id) ||
           (userEmail && mEmail === userEmail) ||
           (userFullName && mName === userFullName) ||
           (userHandle && mName === userHandle)
@@ -845,11 +844,11 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             .filter((m) => m.group_id === item.id)
             .map((m) => {
               const isCurrent =
-                m.user_id === authUser.id ||
                 (userEmail && (m.email || '').trim().toLowerCase() === userEmail) ||
                 (userFullName && (m.name || '').trim().toLowerCase() === userFullName) ||
                 (userHandle && (m.name || '').trim().toLowerCase() === userHandle) ||
-                m.name === 'You';
+                m.name === 'You' ||
+                m.is_current_user;
               const realName =
                 m.name === 'You' && isCurrent
                   ? effectiveProfile.fullName || effectiveProfile.username || 'User'
@@ -859,7 +858,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
                 void client.from('group_members').update({
                   name: realName,
                   email: effectiveProfile.email,
-                  user_id: authUser.id,
                 }).eq('id', m.id);
               }
 
@@ -871,7 +869,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
                 avatarUrl: m.avatar_url || (m.email ? getGravatarUrl(m.email) : isCurrent ? effectiveProfile.avatarUrl || '' : ''),
                 role: m.role === 'owner' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'editor',
                 isCurrentUser: isCurrent,
-                userId: m.user_id || (isCurrent ? authUser.id : undefined),
               };
             }),
         }));
@@ -1681,11 +1678,10 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             id: m.id,
             group_id: newGroup.id,
             name: m.name,
-            email: m.email,
-            avatar_url: m.avatarUrl,
+            email: m.email || '',
+            avatar_url: m.avatarUrl || '',
             role: m.role,
             is_current_user: m.isCurrentUser,
-            user_id: m.isCurrentUser ? userProfile.id || null : null,
           }));
           await client.from('group_members').upsert(membersToInsert);
           showToast(`Group "${name}" synced to database`);
@@ -1763,7 +1759,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             avatar_url: userProfile.avatarUrl || '',
             role: role || 'editor',
             is_current_user: false,
-            user_id: userProfile.id || null,
           });
 
           await client.from('activity_logs').insert({
@@ -2172,11 +2167,10 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             id: m.id,
             group_id: newGroup.id,
             name: m.name,
-            email: m.email,
-            avatar_url: m.avatarUrl,
+            email: m.email || '',
+            avatar_url: m.avatarUrl || '',
             role: m.role,
             is_current_user: m.isCurrentUser,
-            user_id: m.isCurrentUser ? userProfile.id || null : null,
           }));
           return client.from('group_members').upsert(membersToInsert);
         });
@@ -2246,6 +2240,109 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         }));
         void client.from('group_members').upsert(payload);
       }
+    },
+    [
+      groups,
+      allExpenses,
+      allSettlements,
+      activities,
+      isOnline,
+      saveToLocalStorage,
+      broadcastLocalEvent,
+      showToast,
+      sendChatMessage,
+    ]
+  );
+
+  const addMemberByEmail = useCallback(
+    async (groupId: string, email: string, role: 'owner' | 'editor' | 'viewer' = 'editor') => {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail) return { success: false, message: 'Invalid email address' };
+
+      const group = groups.find((g) => g.id === groupId);
+      if (!group) return { success: false, message: 'Group not found' };
+
+      const alreadyMember = group.members.some(
+        (m) =>
+          (m.email && m.email.trim().toLowerCase() === cleanEmail) ||
+          m.name.trim().toLowerCase() === cleanEmail
+      );
+      if (alreadyMember) {
+        showToast(`${cleanEmail} is already in this group`);
+        return { success: false, message: 'Already a member' };
+      }
+
+      const client = getSupabaseClient();
+      const emailPrefix = cleanEmail.split('@')[0] || 'member';
+      let memberName = emailPrefix
+        .split(/[._-]/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+      let avatarUrl = getGravatarUrl(cleanEmail, 120);
+
+      if (client) {
+        try {
+          const { data: profile } = await client
+            .from('profiles')
+            .select('full_name, username, avatar_url')
+            .ilike('email', cleanEmail)
+            .maybeSingle();
+
+          if (profile) {
+            if (profile.full_name) memberName = profile.full_name;
+            else if (profile.username) memberName = profile.username;
+            if (profile.avatar_url) avatarUrl = profile.avatar_url;
+          }
+        } catch {
+        }
+      }
+
+      const newMember: GroupMember = {
+        id: `member-${groupId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        groupId,
+        name: memberName,
+        email: cleanEmail,
+        avatarUrl,
+        role,
+        isCurrentUser: false,
+      };
+
+      const updatedGroups = groups.map((g) => {
+        if (g.id === groupId) {
+          return {
+            ...g,
+            members: [...g.members, newMember],
+          };
+        }
+        return g;
+      });
+
+      setGroups(updatedGroups);
+      saveToLocalStorage(allExpenses, allSettlements, updatedGroups, activities);
+      broadcastLocalEvent('group_updated', { groupId });
+
+      if (client && isOnline) {
+        try {
+          await client.from('group_members').insert({
+            id: newMember.id,
+            group_id: newMember.groupId,
+            name: newMember.name,
+            email: newMember.email,
+            avatar_url: newMember.avatarUrl,
+            role: newMember.role,
+            is_current_user: false,
+          });
+        } catch {
+        }
+      }
+
+      void sendChatMessage({
+        groupId,
+        content: `Added ${memberName} (${cleanEmail}) to the group`,
+      });
+
+      showToast(`Added ${memberName} (${cleanEmail}) to ${group.name}`);
+      return { success: true, message: `Added ${memberName}`, member: newMember };
     },
     [
       groups,
@@ -2389,10 +2486,22 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
   const addFriendDirectly = useCallback(
     async (friend: FriendContact) => {
+      const friendUsername = friend.username || friend.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+      const friendContact: FriendContact = {
+        ...friend,
+        username: friendUsername,
+        name: friend.name || friendUsername,
+        avatarUrl: friend.avatarUrl || (friend.email ? getGravatarUrl(friend.email) : ''),
+      };
+
       setCustomFriends((prev) => {
-        const exists = prev.some((item) => item.username.toLowerCase() === friend.username.toLowerCase());
+        const exists = prev.some(
+          (item) =>
+            (item.username && friendContact.username && item.username.toLowerCase() === friendContact.username.toLowerCase()) ||
+            item.name.toLowerCase() === friendContact.name.toLowerCase()
+        );
         if (exists) return prev;
-        const updated = [friend, ...prev];
+        const updated = [friendContact, ...prev];
         if (typeof window !== 'undefined') {
           window.localStorage.setItem(STORAGE_FRIENDS_KEY, JSON.stringify(updated));
         }
@@ -2403,17 +2512,22 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const client = getSupabaseClient();
       if (client && isOnline) {
         try {
+          const authUser = (await client.auth.getUser()).data.user;
+          const currentUid = authUser?.id || userProfile?.id || 'user';
+          const friendRecordId = friendContact.id?.startsWith('friend-')
+            ? friendContact.id
+            : `friend-${currentUid}-${friendContact.username}`;
+
           await client.from('friends').upsert({
-            id: friend.id,
-            user_id: userProfile.id || null,
-            name: friend.name,
-            username: friend.username,
-            email: friend.email,
-            avatar_url: friend.avatarUrl,
-            phone: '',
-            added_via: friend.addedVia || 'directory',
+            id: friendRecordId,
+            name: friendContact.name,
+            username: friendContact.username,
+            email: friendContact.email || '',
+            avatar_url: friendContact.avatarUrl || '',
+            phone: currentUid,
+            added_via: friendContact.addedVia || 'directory',
           });
-          showToast(`Added @${friend.username} as friend`);
+          showToast(`Added @${friendContact.username} as friend`);
           return;
         } catch {
         }
@@ -2422,13 +2536,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       await queueMutation({
         id: `mut-${Date.now()}`,
         type: 'add_friend',
-        payload: friend as unknown as Record<string, unknown>,
+        payload: friendContact as unknown as Record<string, unknown>,
         timestamp: new Date().toISOString(),
       });
       await refreshPendingCount();
-      showToast(`Added @${friend.username} locally`);
+      showToast(`Added @${friendContact.username} locally`);
     },
-    [isOnline, refreshPendingCount, showToast]
+    [isOnline, refreshPendingCount, showToast, userProfile]
   );
 
   const addFriendByUsername = useCallback(
@@ -2553,6 +2667,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       sendChatMessage,
       createGroupFromChat,
       addMembersToGroup,
+      addMemberByEmail,
       toggleChatMessageLike,
       theme,
       setTheme,
@@ -2618,6 +2733,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       sendChatMessage,
       createGroupFromChat,
       addMembersToGroup,
+      addMemberByEmail,
       toggleChatMessageLike,
       theme,
       setTheme,
