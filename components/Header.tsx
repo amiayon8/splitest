@@ -46,31 +46,64 @@ export function Header() {
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 z-50 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 select-none transition-colors duration-150">
-      <div className="h-16 w-full max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="relative h-16 w-full max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between gap-1.5 sm:gap-3">
+        {isSearchOpen && (
+          <div className="sm:hidden absolute inset-0 bg-white dark:bg-[#0F172A] px-3 flex items-center gap-2 z-30 animate-fade-in border-b border-slate-200/80 dark:border-slate-800">
+            <Search className="w-4 h-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search expenses, groups..."
+              className="flex-1 h-9 px-3 rounded-full bg-[#F1F5F9] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#059669]"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="w-7 h-7 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 text-xs shrink-0"
+              >
+                ×
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setIsSearchOpen(false);
+              }}
+              className="px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white shrink-0"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={() => setCurrentView("wallet")}
-            className="flex items-center gap-2.5 text-left focus:outline-none shrink-0"
+            className="flex items-center gap-2 sm:gap-2.5 text-left focus:outline-none shrink-0"
           >
             <img
               src="/Splitest.svg"
               alt="Splitest"
-              className="w-8 h-8 md:w-10 md:h-10 object-contain shadow-xs"
+              className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 object-contain shadow-xs"
             />
-            <div className="hidden lg:flex flex-col">
-              <span className="text-[17px] text-slate-900 dark:text-slate-100 font-bold tracking-tight leading-none">
+            <div className="flex flex-col">
+              <span className="text-[15px] sm:text-[17px] text-slate-900 dark:text-slate-100 font-bold tracking-tight leading-none">
                 Splitest
               </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium tracking-wide mt-0.5">
+              <span className="hidden lg:block text-[11px] text-slate-500 dark:text-slate-400 font-medium tracking-wide mt-0.5">
                 Material You Ledger
               </span>
             </div>
           </button>
         </div>
 
-        <div className="flex items-center justify-center">
-          <div className="bg-[#F1F5F9] dark:bg-slate-800/90 p-1 rounded-full flex items-center border border-slate-200/60 dark:border-slate-700 shadow-2xs">
+        <div className="flex items-center justify-center shrink-0">
+          <div className="bg-[#F1F5F9] dark:bg-slate-800/90 p-0.5 sm:p-1 rounded-full flex items-center border border-slate-200/60 dark:border-slate-700 shadow-2xs">
             <button
               type="button"
               onClick={() => {
@@ -79,13 +112,13 @@ export function Header() {
                   setCurrentView("wallet");
                 }
               }}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-all shrink-0 ${
                 segment === "groups"
                   ? "bg-white dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 shadow-xs"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
               }`}
             >
-              <Users className="w-3.5 h-3.5 text-[#059669] dark:text-[#10B981]" />
+              <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#059669] dark:text-[#10B981]" />
               <span>Groups</span>
             </button>
             <button
@@ -96,21 +129,21 @@ export function Header() {
                   setCurrentView("groups");
                 }
               }}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-all shrink-0 ${
                 segment === "friends"
                   ? "bg-white dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 shadow-xs"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
               }`}
             >
-              <UserCheck className="w-3.5 h-3.5 text-[#059669] dark:text-[#10B981]" />
+              <UserCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#059669] dark:text-[#10B981]" />
               <span>Friends</span>
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {isSearchOpen ? (
-            <div className="relative flex items-center animate-fade-in">
+            <div className="hidden sm:flex relative items-center animate-fade-in">
               <input
                 type="text"
                 autoFocus
@@ -135,7 +168,7 @@ export function Header() {
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
-              className="w-9 h-9 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
               aria-label="Search transactions"
             >
               <Search className="w-4 h-4" />
@@ -145,7 +178,7 @@ export function Header() {
           <button
             type="button"
             onClick={toggleNextTheme}
-            className="w-9 h-9 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+            className="w-9 h-9 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 hidden sm:flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
             title={`Current theme: ${theme}. Click to switch.`}
             aria-label="Toggle theme appearance"
           >
@@ -158,43 +191,52 @@ export function Header() {
             )}
           </button>
 
-          <div className="relative flex items-center pl-1">
+          <div className="relative flex items-center">
             <button
               type="button"
               onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-              className="w-9 h-9 rounded-full ring-2 ring-emerald-200 dark:ring-emerald-800 hover:ring-[#059669] transition-all overflow-hidden focus:outline-none shadow-2xs shrink-0 flex items-center justify-center bg-[#059669] text-white"
+              className="w-8 h-8 sm:w-9 sm:h-9 flex rounded-full ring-2 ring-emerald-200 dark:ring-emerald-800 hover:ring-[#059669] transition-all overflow-hidden focus:outline-none shadow-2xs shrink-0 items-center justify-center bg-[#059669] text-white"
               aria-label="Profile menu"
             >
               {userProfile.avatarUrl ? (
                 <img
                   src={userProfile.avatarUrl}
-                  alt={userProfile.fullName || 'User'}
+                  alt={userProfile.fullName || "User"}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <span className="font-bold text-xs uppercase">
-                  {(userProfile.fullName || userProfile.email || 'U').charAt(0)}
+                  {(userProfile.fullName || userProfile.email || "U").charAt(0)}
                 </span>
               )}
             </button>
 
             {isProfileDropdownOpen && (
-              <div className="absolute right-0 top-12 w-72 bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-200/90 dark:border-slate-700 shadow-xl py-2 z-50 animate-fade-in divide-y divide-slate-100 dark:divide-slate-800">
-                <div className="px-4 py-3 flex items-center gap-3">
-                  {userProfile.avatarUrl ? (
-                    <img
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsProfileDropdownOpen(false)}
+                />
+                <div className="absolute right-0 top-11 sm:top-12 w-72 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-200/90 dark:border-slate-700 shadow-xl py-2 z-50 animate-fade-in divide-y divide-slate-100 dark:divide-slate-800">
+                  <div className="px-4 py-3 flex items-center gap-3">
+                    {userProfile.avatarUrl ? (
+                      <img
                       src={userProfile.avatarUrl}
-                      alt={userProfile.fullName || 'User'}
+                      alt={userProfile.fullName || "User"}
                       className="w-11 h-11 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
                     />
                   ) : (
                     <div className="w-11 h-11 rounded-2xl bg-[#059669] text-white flex items-center justify-center font-bold text-base uppercase shrink-0 border border-slate-200 dark:border-slate-700">
-                      {(userProfile.fullName || userProfile.email || 'U').charAt(0)}
+                      {(
+                        userProfile.fullName ||
+                        userProfile.email ||
+                        "U"
+                      ).charAt(0)}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                      {userProfile.fullName || 'User'}
+                      {userProfile.fullName || "User"}
                     </h4>
                     {userProfile.email && (
                       <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
@@ -323,7 +365,8 @@ export function Header() {
                   </button>
                 </div>
               </div>
-            )}
+            </>
+          )}
           </div>
         </div>
       </div>
