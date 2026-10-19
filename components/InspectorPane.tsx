@@ -10,6 +10,7 @@ import {
   calculateDirectDebts,
   calculateCategoryBreakdown,
   getCurrentUserMemberName,
+  isMemberCurrentUser,
 } from '@/lib/split-calculator';
 import {
   ArrowRight,
@@ -47,11 +48,7 @@ export function InspectorPane() {
   const [commentText, setCommentText] = useState('');
 
   const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
-  const isSelf = (name: string) =>
-    name === currentMemberName ||
-    name === 'You' ||
-    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
-    (Boolean(userProfile?.username) && name === userProfile.username);
+  const isSelf = (name: string) => isMemberCurrentUser(name, activeGroup, userProfile);
 
   const memberNames = useMemo(() => activeGroup.members.map((m) => m.name), [activeGroup]);
 

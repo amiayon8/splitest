@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useSplitest } from "@/lib/store";
 import { formatCurrency } from "@/lib/currency";
-import { calculateMemberBalances, getCurrentUserBalance, getCurrentUserMemberName } from "@/lib/split-calculator";
+import { calculateMemberBalances, getCurrentUserBalance, getCurrentUserMemberName, isMemberCurrentUser } from "@/lib/split-calculator";
 import {
   Plus,
   Handshake,
@@ -67,7 +67,7 @@ export function WalletCardDeck() {
         gSettlements,
       );
       const currentMemberName = getCurrentUserMemberName(group, userProfile);
-      const isSelf = (n: string) => n === currentMemberName || n === "You";
+      const isSelf = (n: string) => isMemberCurrentUser(n, group, userProfile);
       const net = getCurrentUserBalance(balances, group, userProfile)?.netBalance || 0;
 
       let youOwe = 0;

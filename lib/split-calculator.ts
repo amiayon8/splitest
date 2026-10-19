@@ -232,21 +232,45 @@ export function getCurrentUserMemberName(
   if (!group || !group.members || group.members.length === 0) {
     return userProfile?.fullName || userProfile?.username || 'You';
   }
+
   const email = (userProfile?.email || '').trim().toLowerCase();
   const name = (userProfile?.fullName || '').trim().toLowerCase();
   const handle = (userProfile?.username || '').trim().toLowerCase();
 
-  const found = group.members.find((m) => {
-    if (m.isCurrentUser) return true;
-    if (email && m.email && m.email.trim().toLowerCase() === email) return true;
-    const mName = m.name.trim().toLowerCase();
-    if (name && mName === name) return true;
-    if (handle && mName === handle) return true;
-    if (mName === 'you') return true;
-    return false;
-  });
+  if (email) {
+    const matchByEmail = group.members.find(
+      (m) => m.email && m.email.trim().toLowerCase() === email
+    );
+    if (matchByEmail) return matchByEmail.name;
+  }
 
-  return found?.name || userProfile?.fullName || userProfile?.username || 'You';
+  if (handle) {
+    const matchByHandle = group.members.find((m) => {
+      const mName = m.name.trim().toLowerCase();
+      const mEmail = (m.email || '').trim().toLowerCase();
+      return mName === handle || (mEmail && mEmail.split('@')[0] === handle);
+    });
+    if (matchByHandle) return matchByHandle.name;
+  }
+
+  if (name) {
+    const matchByName = group.members.find(
+      (m) => m.name.trim().toLowerCase() === name
+    );
+    if (matchByName) return matchByName.name;
+  }
+
+  const matchByFlag = group.members.find((m) => {
+    if (!m.isCurrentUser) return false;
+    if (email && m.email && m.email.trim().toLowerCase() !== email) return false;
+    return true;
+  });
+  if (matchByFlag) return matchByFlag.name;
+
+  const matchYou = group.members.find((m) => m.name.trim().toLowerCase() === 'you');
+  if (matchYou) return matchYou.name;
+
+  return userProfile?.fullName || userProfile?.username || group.members[0]?.name || 'You';
 }
 
 export function getCurrentUserBalance(
@@ -255,6 +279,63 @@ export function getCurrentUserBalance(
   userProfile?: UserProfile | null
 ): MemberBalanceSummary | undefined {
   const currentName = getCurrentUserMemberName(group, userProfile);
-  return balances[currentName] || balances['You'];
+  if (balances[currentName]) return balances[currentName];
+
+  for (const [key, value] of Object.entries(balances)) {
+    if (key.trim().toLowerCase() === currentName.trim().toLowerCase()) {
+      return value;
+    }
+  }
+
+  if (userProfile?.fullName) {
+    for (const [key, value] of Object.entries(balances)) {
+      if (key.trim().toLowerCase() === userProfile.fullName.trim().toLowerCase()) {
+        return value;
+      }
+    }
+  }
+
+  if (userProfile?.username) {
+    for (const [key, value] of Object.entries(balances)) {
+      if (key.trim().toLowerCase() === userProfile.username.trim().toLowerCase()) {
+        return value;
+      }
+    }
+  }
+
+  return balances['You'];
+}
+
+export function isMemberCurrentUser(
+  memberName: string,
+  group?: Group | null,
+  userProfile?: UserProfile | null
+): boolean {
+  if (!memberName) return false;
+  const currentName = getCurrentUserMemberName(group, userProfile);
+  const cleanTarget = memberName.trim().toLowerCase();
+  if (cleanTarget === currentName.trim().toLowerCase()) {
+    return true;
+  }
+
+  if (userProfile) {
+    const email = (userProfile.email || '').trim().toLowerCase();
+    const handle = (userProfile.username || '').trim().toLowerCase();
+    const fullName = (userProfile.fullName || '').trim().toLowerCase();
+
+    if (handle && cleanTarget === handle) return true;
+    if (fullName && cleanTarget === fullName) return true;
+
+    if (email && group?.members) {
+      const match = group.members.find(
+        (m) => m.name.trim().toLowerCase() === cleanTarget
+      );
+      if (match?.email && match.email.trim().toLowerCase() === email) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 

@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useSplitest } from '@/lib/store';
 import { formatCurrency } from '@/lib/currency';
-import { calculateMemberBalances, getCurrentUserBalance, getCurrentUserMemberName } from '@/lib/split-calculator';
+import { calculateMemberBalances, calculateDirectDebts, getCurrentUserBalance, getCurrentUserMemberName, isMemberCurrentUser } from '@/lib/split-calculator';
 import { WalletCardDeck } from '@/components/WalletCardDeck';
 import { buildProfileShareUrl } from '@/lib/users-directory';
 import { getGravatarUrl } from '@/lib/avatar';
@@ -66,18 +66,17 @@ export function GroupsView() {
     for (const group of groups) {
       const gExpenses = allExpenses.filter((item) => item.groupId === group.id);
       const gSettlements = allSettlements.filter((item) => item.groupId === group.id);
-      const memberNames = group.members.map((m) => m.name);
-      const balances = calculateMemberBalances(memberNames, gExpenses, gSettlements);
-      const currentMemberName = getCurrentUserMemberName(group, userProfile);
+      const directDebts = calculateDirectDebts(gExpenses, gSettlements);
 
       for (const member of group.members) {
         if (
-          member.name === currentMemberName ||
-          member.name === 'You' ||
+          isMemberCurrentUser(member.name, group, userProfile) ||
+          (member.email && userProfile.email && member.email.toLowerCase() === userProfile.email.toLowerCase()) ||
           (member.userId && member.userId === userProfile.id)
         ) {
           continue;
         }
+
         const generatedUsername = member.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
         const current = friendsMap.get(member.name.toLowerCase()) || {
           name: member.name,
@@ -86,8 +85,17 @@ export function GroupsView() {
           netBalance: 0,
           groupCount: 0,
         };
-        const memberNet = balances[member.name]?.netBalance || 0;
-        current.netBalance += -memberNet / (group.members.length > 1 ? group.members.length - 1 : 1);
+
+        let pairDebt = 0;
+        for (const d of directDebts) {
+          if (isMemberCurrentUser(d.creditor, group, userProfile) && d.debtor.toLowerCase() === member.name.toLowerCase()) {
+            pairDebt += d.amount;
+          } else if (isMemberCurrentUser(d.debtor, group, userProfile) && d.creditor.toLowerCase() === member.name.toLowerCase()) {
+            pairDebt -= d.amount;
+          }
+        }
+
+        current.netBalance += pairDebt;
         current.groupCount += 1;
         friendsMap.set(member.name.toLowerCase(), current);
       }

@@ -9,6 +9,7 @@ import {
   normalizeUsernameInput,
   PublicUserProfile,
 } from '@/lib/users-directory';
+import { isMemberCurrentUser } from '@/lib/split-calculator';
 import {
   X,
   UserPlus,
@@ -27,6 +28,7 @@ export function AddFriendModal() {
     setIsAddFriendModalOpen,
     allFriendsList,
     groups,
+    userProfile,
     addFriendDirectly,
     addFriendByUsername,
     setIsShareProfileModalOpen,
@@ -74,7 +76,7 @@ export function AddFriendModal() {
     const seen = new Set<string>();
     groups.forEach((g) => {
       g.members.forEach((m) => {
-        if (!m.isCurrentUser) {
+        if (!m.isCurrentUser && !isMemberCurrentUser(m.name, g, userProfile)) {
           const username = m.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
           if (!seen.has(username) && !allFriendsList.some((f) => f.username.toLowerCase() === username)) {
             seen.add(username);
@@ -93,7 +95,7 @@ export function AddFriendModal() {
       });
     });
     return list;
-  }, [groups, allFriendsList]);
+  }, [groups, allFriendsList, userProfile]);
 
   if (!isAddFriendModalOpen) return null;
 

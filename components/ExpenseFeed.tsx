@@ -5,7 +5,7 @@ import { useSplitest } from '@/lib/store';
 import { formatCurrency } from '@/lib/currency';
 import { LocalTime, formatMonthYear } from '@/lib/timezone';
 import { WalletCardDeck } from '@/components/WalletCardDeck';
-import { calculateMemberBalances, getCurrentUserMemberName, getCurrentUserBalance } from '@/lib/split-calculator';
+import { calculateMemberBalances, getCurrentUserMemberName, getCurrentUserBalance, isMemberCurrentUser } from '@/lib/split-calculator';
 import { Expense } from '@/types';
 import {
   Share2,
@@ -52,8 +52,8 @@ export function ExpenseFeed() {
   );
 
   const isSelf = useMemo(() => {
-    return (name: string) => name === currentMemberName || name === 'You';
-  }, [currentMemberName]);
+    return (name: string) => isMemberCurrentUser(name, activeGroup, userProfile);
+  }, [activeGroup, userProfile]);
 
   const memberNames = useMemo(() => activeGroup.members.map((m) => m.name), [activeGroup]);
 

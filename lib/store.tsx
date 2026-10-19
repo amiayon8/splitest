@@ -516,7 +516,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
                 email: m.email,
                 avatar_url: m.avatarUrl,
                 role: m.role,
-                is_current_user: m.isCurrentUser,
+                is_current_user: false,
               }));
               await client.from('group_members').upsert(membersPayload);
             }
@@ -843,12 +843,14 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           members: rawMembers
             .filter((m) => m.group_id === item.id)
             .map((m) => {
-              const isCurrent =
-                (userEmail && (m.email || '').trim().toLowerCase() === userEmail) ||
-                (userFullName && (m.name || '').trim().toLowerCase() === userFullName) ||
-                (userHandle && (m.name || '').trim().toLowerCase() === userHandle) ||
-                m.name === 'You' ||
-                m.is_current_user;
+              const memberEmail = (m.email || '').trim().toLowerCase();
+              const memberName = (m.name || '').trim().toLowerCase();
+
+              const isMatchByEmail = Boolean(userEmail && memberEmail && memberEmail === userEmail);
+              const isMatchByName = Boolean(userFullName && memberName && memberName === userFullName);
+              const isMatchByHandle = Boolean(userHandle && memberName && memberName === userHandle);
+              const isCurrent = isMatchByEmail || (!memberEmail && (isMatchByName || isMatchByHandle));
+
               const realName =
                 m.name === 'You' && isCurrent
                   ? effectiveProfile.fullName || effectiveProfile.username || 'User'
@@ -1681,7 +1683,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             email: m.email || '',
             avatar_url: m.avatarUrl || '',
             role: m.role,
-            is_current_user: m.isCurrentUser,
+            is_current_user: false,
           }));
           await client.from('group_members').upsert(membersToInsert);
           showToast(`Group "${name}" synced to database`);
@@ -2170,7 +2172,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             email: m.email || '',
             avatar_url: m.avatarUrl || '',
             role: m.role,
-            is_current_user: m.isCurrentUser,
+            is_current_user: false,
           }));
           return client.from('group_members').upsert(membersToInsert);
         });
@@ -2236,7 +2238,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           email: m.email,
           avatar_url: m.avatarUrl,
           role: m.role,
-          is_current_user: m.isCurrentUser,
+          is_current_user: false,
         }));
         void client.from('group_members').upsert(payload);
       }
@@ -2452,37 +2454,54 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
   const allFriendsList = useMemo<FriendContact[]>(() => {
     const friendMap = new Map<string, FriendContact>();
+    const userEmail = (userProfile.email || '').trim().toLowerCase();
+    const userFullName = (userProfile.fullName || '').trim().toLowerCase();
+    const userHandle = (userProfile.username || '').trim().toLowerCase();
 
     groups.forEach((group) => {
       group.members.forEach((member) => {
-        if (!member.isCurrentUser) {
-          const generatedUsername = member.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
-          const existing = friendMap.get(generatedUsername);
-          if (existing) {
-            friendMap.set(generatedUsername, {
-              ...existing,
-              groupCount: (existing.groupCount || 0) + 1,
-            });
-          } else {
-            friendMap.set(generatedUsername, {
-              id: member.id,
-              name: member.name,
-              username: generatedUsername,
-              avatarUrl: member.avatarUrl || (member.email ? getGravatarUrl(member.email) : ''),
-              email: member.email || '',
-              groupCount: 1,
-            });
-          }
+        const mEmail = (member.email || '').trim().toLowerCase();
+        const mName = (member.name || '').trim().toLowerCase();
+        const isSelf =
+          member.isCurrentUser ||
+          (Boolean(userEmail) && Boolean(mEmail) && mEmail === userEmail) ||
+          (Boolean(userFullName) && mName === userFullName) ||
+          (Boolean(userHandle) && mName === userHandle) ||
+          mName === 'you';
+        if (isSelf) return;
+
+        const generatedUsername = member.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+        const existing = friendMap.get(generatedUsername);
+        if (existing) {
+          friendMap.set(generatedUsername, {
+            ...existing,
+            groupCount: (existing.groupCount || 0) + 1,
+          });
+        } else {
+          friendMap.set(generatedUsername, {
+            id: member.id,
+            name: member.name,
+            username: generatedUsername,
+            avatarUrl: member.avatarUrl || (member.email ? getGravatarUrl(member.email) : ''),
+            email: member.email || '',
+            groupCount: 1,
+          });
         }
       });
     });
 
     customFriends.forEach((friend) => {
-      friendMap.set(friend.username.toLowerCase(), friend);
+      const fUsername = (friend.username || '').toLowerCase();
+      const isSelf =
+        (Boolean(userHandle) && fUsername === userHandle) ||
+        (Boolean(userEmail) && friend.email && friend.email.toLowerCase() === userEmail);
+      if (!isSelf && fUsername) {
+        friendMap.set(fUsername, friend);
+      }
     });
 
     return Array.from(friendMap.values());
-  }, [groups, customFriends]);
+  }, [groups, customFriends, userProfile]);
 
   const addFriendDirectly = useCallback(
     async (friend: FriendContact) => {

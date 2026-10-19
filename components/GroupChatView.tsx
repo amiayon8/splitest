@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useSplitest } from "@/lib/store";
 import { formatCurrency } from "@/lib/currency";
 import { LocalTime } from "@/lib/timezone";
-import { getCurrentUserMemberName } from "@/lib/split-calculator";
+import { getCurrentUserMemberName, isMemberCurrentUser } from "@/lib/split-calculator";
 import { ChatAttachment } from "@/types";
 import {
   Send,
@@ -73,11 +73,7 @@ export function GroupChatView() {
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
 
   const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
-  const isSelf = (name: string) =>
-    name === currentMemberName ||
-    name === "You" ||
-    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
-    (Boolean(userProfile?.username) && name === userProfile.username);
+  const isSelf = (name: string) => isMemberCurrentUser(name, activeGroup, userProfile);
 
   const [customExpenseTitle, setCustomExpenseTitle] = useState("");
   const [customExpenseAmount, setCustomExpenseAmount] = useState("");

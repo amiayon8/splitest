@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { useSplitest } from '@/lib/store';
 import { formatCurrency } from '@/lib/currency';
-import { getCurrentUserMemberName } from '@/lib/split-calculator';
+import { getCurrentUserMemberName, isMemberCurrentUser } from '@/lib/split-calculator';
 import { LocalTime, formatMonthYear } from '@/lib/timezone';
 import { Expense } from '@/types';
 import {
@@ -37,11 +37,7 @@ export function AllExpensesView() {
   } = useSplitest();
 
   const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
-  const isSelf = (name: string) =>
-    name === currentMemberName ||
-    name === 'You' ||
-    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
-    (Boolean(userProfile?.username) && name === userProfile.username);
+  const isSelf = (name: string) => isMemberCurrentUser(name, activeGroup, userProfile);
 
   const filteredExpenses = useMemo(() => {
     let list = [...expenses];

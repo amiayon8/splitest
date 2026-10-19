@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSplitest } from "@/lib/store";
 import { getSupabaseClient } from "@/lib/supabase";
+import { isMemberCurrentUser } from "@/lib/split-calculator";
 import {
   X,
   Copy,
@@ -282,7 +283,7 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
                         <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                           {member.name}
                         </span>
-                        {member.isCurrentUser && (
+                        {isMemberCurrentUser(member.name, activeGroup, userProfile) && (
                           <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full font-medium">
                             You
                           </span>

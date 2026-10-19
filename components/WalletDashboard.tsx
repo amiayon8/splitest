@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { useSplitest } from '@/lib/store';
 import { WalletCardDeck } from '@/components/WalletCardDeck';
 import { formatCurrency } from '@/lib/currency';
-import { getCurrentUserMemberName } from '@/lib/split-calculator';
+import { getCurrentUserMemberName, isMemberCurrentUser } from '@/lib/split-calculator';
 import { LocalTime } from '@/lib/timezone';
 import { Expense } from '@/types';
 import {
@@ -36,11 +36,7 @@ export function WalletDashboard() {
   } = useSplitest();
 
   const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
-  const isSelf = (name: string) =>
-    name === currentMemberName ||
-    name === 'You' ||
-    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
-    (Boolean(userProfile?.username) && name === userProfile.username);
+  const isSelf = (name: string) => isMemberCurrentUser(name, activeGroup, userProfile);
 
   const recentExpenses = useMemo(() => {
     return [...expenses]
