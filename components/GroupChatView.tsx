@@ -52,6 +52,7 @@ export function GroupChatView() {
     userProfile,
     allFriendsList,
     setIsAddFriendModalOpen,
+    startDirectChat,
   } = useSplitest();
 
   const [messageInput, setMessageInput] = useState("");
@@ -74,6 +75,17 @@ export function GroupChatView() {
 
   const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
   const isSelf = (name: string) => isMemberCurrentUser(name, activeGroup, userProfile);
+
+  const isDirectChatActive = Boolean(
+    activeGroup?.isDirectChat ||
+    activeGroup?.category === "Direct" ||
+    activeGroup?.id.startsWith("dm-")
+  );
+
+  const directChatOtherMember = useMemo(() => {
+    if (!isDirectChatActive || !activeGroup) return null;
+    return activeGroup.members.find((m) => !isSelf(m.name)) || activeGroup.members[0] || null;
+  }, [isDirectChatActive, activeGroup, isSelf]);
 
   const [customExpenseTitle, setCustomExpenseTitle] = useState("");
   const [customExpenseAmount, setCustomExpenseAmount] = useState("");
@@ -227,19 +239,41 @@ export function GroupChatView() {
     if (selectedFriendNames.length === 0) return;
 
     if (searchFriendsModalMode === "new_chat") {
-      const generatedName =
-        newChatGroupName.trim() ||
-        (selectedFriendNames.length === 1
-          ? `${selectedFriendNames[0]} & You`
-          : `${selectedFriendNames.slice(0, 2).join(", ")} & You`);
+      if (selectedFriendNames.length === 1) {
+        const friendName = selectedFriendNames[0];
+        const friendObj =
+          allAvailableFriends.find(
+            (f) =>
+              f.name.toLowerCase() === friendName.toLowerCase() ||
+              f.username?.toLowerCase() === friendName.toLowerCase(),
+          ) ||
+          allFriendsList.find(
+            (f) =>
+              f.name.toLowerCase() === friendName.toLowerCase() ||
+              f.username?.toLowerCase() === friendName.toLowerCase(),
+          );
 
-      const createdId = createGroupFromChat(
-        generatedName,
-        newChatCategory,
-        selectedFriendNames,
-      );
-      setActiveGroupId(createdId);
-      setIsMobileInboxView(false);
+        const createdId = startDirectChat({
+          name: friendName,
+          username: friendObj?.username,
+          email: friendObj?.email,
+          avatarUrl: friendObj?.avatarUrl,
+        });
+        setActiveGroupId(createdId);
+        setIsMobileInboxView(false);
+      } else {
+        const generatedName =
+          newChatGroupName.trim() ||
+          `${selectedFriendNames.slice(0, 2).join(", ")} & You`;
+
+        const createdId = createGroupFromChat(
+          generatedName,
+          newChatCategory,
+          selectedFriendNames,
+        );
+        setActiveGroupId(createdId);
+        setIsMobileInboxView(false);
+      }
     } else if (searchFriendsModalMode === "add_to_group" && activeGroup) {
       addMembersToGroup(activeGroup.id, selectedFriendNames);
     }
@@ -618,6 +652,17 @@ export function GroupChatView() {
           {filteredGroupsList.map((group) => {
             const isSelected = group.id === activeGroupId;
             const lastData = groupLastMessageMap[group.id];
+            const isDm = Boolean(
+              group.isDirectChat ||
+              group.category === "Direct" ||
+              group.id.startsWith("dm-"),
+            );
+            const otherMember = isDm
+              ? group.members.find((m) => !isSelf(m.name)) || group.members[0]
+              : null;
+            const displayName = isDm && otherMember ? otherMember.name : group.name;
+            const displaySubtitle = isDm ? "Direct Message" : group.category;
+            const avatarUrl = isDm ? otherMember?.avatarUrl : null;
 
             return (
               <button
@@ -634,9 +679,17 @@ export function GroupChatView() {
                 }`}
               >
                 <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-[#E5E7EB] dark:bg-neutral-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-base border border-slate-200 dark:border-neutral-700">
-                    {group.name.slice(0, 1)}
-                  </div>
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={displayName}
+                      className="w-12 h-12 rounded-full object-cover border border-slate-200 dark:border-neutral-700"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-[#E5E7EB] dark:bg-neutral-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-base border border-slate-200 dark:border-neutral-700">
+                      {displayName.slice(0, 1)}
+                    </div>
+                  )}
                   <div className="w-3.5 h-3.5 rounded-full bg-[#10B981] border-2 border-white dark:border-black absolute bottom-0 right-0" />
                 </div>
 
@@ -649,10 +702,10 @@ export function GroupChatView() {
                           : "font-semibold text-slate-800 dark:text-slate-200"
                       }`}
                     >
-                      {group.name}
+                      {displayName}
                     </span>
                     <span className="text-[10px] text-slate-400 dark:text-slate-400 shrink-0">
-                      {group.category}
+                      {displaySubtitle}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
@@ -682,43 +735,55 @@ export function GroupChatView() {
             </button>
 
             <div className="relative shrink-0">
-              <div className="w-10 h-10 rounded-full bg-[#E5E7EB] dark:bg-neutral-800 text-slate-800 dark:text-slate-200 flex items-center justify-center font-bold text-sm border border-slate-200 dark:border-neutral-700">
-                {activeGroup?.name?.slice(0, 1) || "G"}
-              </div>
+              {isDirectChatActive && directChatOtherMember?.avatarUrl ? (
+                <img
+                  src={directChatOtherMember.avatarUrl}
+                  alt={directChatOtherMember.name}
+                  className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-neutral-700"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-[#E5E7EB] dark:bg-neutral-800 text-slate-800 dark:text-slate-200 flex items-center justify-center font-bold text-sm border border-slate-200 dark:border-neutral-700">
+                  {(isDirectChatActive && directChatOtherMember ? directChatOtherMember.name : activeGroup?.name)?.slice(0, 1) || "G"}
+                </div>
+              )}
               <div className="w-3 h-3 rounded-full bg-[#10B981] border-2 border-white dark:border-black absolute bottom-0 right-0" />
             </div>
 
             <div className="min-w-0">
               <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate">
-                {activeGroup?.name || "Splitest Chat"}
+                {isDirectChatActive && directChatOtherMember ? directChatOtherMember.name : activeGroup?.name || "Splitest Chat"}
               </h2>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 leading-none mt-0.5">
                 <span>Active now</span>
                 <span>&bull;</span>
-                <span>{groupMembers.length} members</span>
+                <span>{isDirectChatActive ? "Direct Message" : `${groupMembers.length} members`}</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              onClick={handleOpenAddFriendsModal}
-              className="h-8 px-2.5 sm:px-3 rounded-full bg-[#EFEFEF] dark:bg-[#262626] hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              title="Add friends to group"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Add Friends</span>
-            </button>
+            {!isDirectChatActive && (
+              <button
+                type="button"
+                onClick={handleOpenAddFriendsModal}
+                className="h-8 px-2.5 sm:px-3 rounded-full bg-[#EFEFEF] dark:bg-[#262626] hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                title="Add friends to group"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Add Friends</span>
+              </button>
+            )}
 
-            <button
-              type="button"
-              onClick={() => setIsLedgerSettingsModalOpen(true)}
-              className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-neutral-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
-              title="Ledger Settings"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-            </button>
+            {!isDirectChatActive && (
+              <button
+                type="button"
+                onClick={() => setIsLedgerSettingsModalOpen(true)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-neutral-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
+                title="Ledger Settings"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+            )}
 
             <button
               type="button"
@@ -741,31 +806,43 @@ export function GroupChatView() {
             className="flex-1 overflow-y-auto px-4 py-6 space-y-4 thin-scrollbar bg-white dark:bg-[#000000]"
           >
             <div className="flex flex-col items-center justify-center text-center py-6 border-b border-slate-100 dark:border-neutral-900 mb-6">
-              <div className="w-16 h-16 rounded-full bg-[#E5E7EB] dark:bg-neutral-800 text-slate-800 dark:text-slate-200 flex items-center justify-center font-bold text-2xl mb-3 shadow-2xs border border-slate-200 dark:border-neutral-700">
-                {activeGroup?.name?.slice(0, 1) || "G"}
-              </div>
+              {isDirectChatActive && directChatOtherMember?.avatarUrl ? (
+                <img
+                  src={directChatOtherMember.avatarUrl}
+                  alt={directChatOtherMember.name}
+                  className="w-16 h-16 rounded-full object-cover mb-3 shadow-2xs border border-slate-200 dark:border-neutral-700"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-[#E5E7EB] dark:bg-neutral-800 text-slate-800 dark:text-slate-200 flex items-center justify-center font-bold text-2xl mb-3 shadow-2xs border border-slate-200 dark:border-neutral-700">
+                  {(isDirectChatActive && directChatOtherMember ? directChatOtherMember.name : activeGroup?.name)?.slice(0, 1) || "G"}
+                </div>
+              )}
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                {activeGroup?.name}
+                {isDirectChatActive && directChatOtherMember ? directChatOtherMember.name : activeGroup?.name}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
-                Shared expense workspace &bull; {groupMembers.length} members
+                {isDirectChatActive
+                  ? "Direct conversation"
+                  : `Shared expense workspace \u2022 ${groupMembers.length} members`}
               </p>
-              <div className="flex items-center gap-2 mt-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("wallet")}
-                  className="px-3.5 py-1.5 rounded-full bg-[#EFEFEF] dark:bg-[#262626] text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-neutral-700 transition-colors"
-                >
-                  View Ledger
-                </button>
-                <button
-                  type="button"
-                  onClick={handleOpenAddFriendsModal}
-                  className="px-3.5 py-1.5 rounded-full bg-[#EFEFEF] dark:bg-[#262626] text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-neutral-700 transition-colors"
-                >
-                  Search & Add Friends
-                </button>
-              </div>
+              {!isDirectChatActive && (
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("wallet")}
+                    className="px-3.5 py-1.5 rounded-full bg-[#EFEFEF] dark:bg-[#262626] text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-neutral-700 transition-colors"
+                  >
+                    View Ledger
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddFriendsModal}
+                    className="px-3.5 py-1.5 rounded-full bg-[#EFEFEF] dark:bg-[#262626] text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-neutral-700 transition-colors"
+                  >
+                    Search & Add Friends
+                  </button>
+                </div>
+              )}
             </div>
 
             {chatMessages.map((msg, index) => {
@@ -972,15 +1049,17 @@ export function GroupChatView() {
             <div className="w-64 border-l border-slate-100 dark:border-neutral-800 p-4 space-y-4 bg-white dark:bg-[#000000] overflow-y-auto thin-scrollbar hidden lg:block animate-fade-in">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                  Group Members
+                  {isDirectChatActive ? "Participants" : "Group Members"}
                 </h4>
-                <button
-                  type="button"
-                  onClick={handleOpenAddFriendsModal}
-                  className="text-xs font-bold text-[#059669] hover:underline"
-                >
-                  Add
-                </button>
+                {!isDirectChatActive && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAddFriendsModal}
+                    className="text-xs font-bold text-[#059669] hover:underline"
+                  >
+                    Add
+                  </button>
+                )}
               </div>
 
               <div className="space-y-2">

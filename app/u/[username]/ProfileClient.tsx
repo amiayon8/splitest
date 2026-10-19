@@ -33,6 +33,7 @@ export default function ProfileClient({ username }: ProfileClientProps) {
     addFriendDirectly,
     setCurrentView,
     showToast,
+    startDirectChat,
   } = useSplitest();
 
   const [copiedLink, setCopiedLink] = useState(false);
@@ -118,7 +119,16 @@ export default function ProfileClient({ username }: ProfileClientProps) {
   };
 
   const handleStartChat = () => {
-    setCurrentView("chat");
+    if (targetUser) {
+      startDirectChat({
+        name: targetUser.name,
+        username: targetUser.username,
+        email: targetUser.email,
+        avatarUrl: targetUser.avatarUrl,
+      });
+    } else {
+      setCurrentView("chat");
+    }
     router.push("/");
   };
 

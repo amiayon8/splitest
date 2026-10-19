@@ -31,6 +31,7 @@ export interface Group {
   userRole: 'owner' | 'editor' | 'viewer';
   createdAt: string;
   members: GroupMember[];
+  isDirectChat?: boolean;
 }
 
 export interface ExpenseSplit {

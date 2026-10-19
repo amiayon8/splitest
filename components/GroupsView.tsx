@@ -23,6 +23,7 @@ import {
 export function GroupsView() {
   const {
     groups,
+    expenseGroups,
     activeGroupId,
     setActiveGroupId,
     allExpenses,
@@ -41,13 +42,14 @@ export function GroupsView() {
     allFriendsList,
     userProfile,
     showToast,
+    startDirectChat,
   } = useSplitest();
 
   const [copiedLink, setCopiedLink] = useState(false);
 
   const groupBalances = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const group of groups) {
+    for (const group of expenseGroups) {
       const gExpenses = allExpenses.filter((item) => item.groupId === group.id);
       const gSettlements = allSettlements.filter((item) => item.groupId === group.id);
       const memberNames = group.members.map((m) => m.name);
@@ -55,7 +57,7 @@ export function GroupsView() {
       map[group.id] = getCurrentUserBalance(balances, group, userProfile)?.netBalance || 0;
     }
     return map;
-  }, [groups, allExpenses, allSettlements, userProfile]);
+  }, [expenseGroups, allExpenses, allSettlements, userProfile]);
 
   const friendsList = useMemo(() => {
     const friendsMap = new Map<
@@ -178,7 +180,7 @@ export function GroupsView() {
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {segment === 'groups'
-              ? `${groups.length} active group ledgers linked to your account`
+              ? `${expenseGroups.length} active group ledgers linked to your account`
               : `${friendsList.length} connections across all shared ledgers`}
           </p>
         </div>
@@ -228,7 +230,7 @@ export function GroupsView() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {groups.map((group) => {
+            {expenseGroups.map((group) => {
               const balance = groupBalances[group.id] || 0;
               const isCurrent = activeGroupId === group.id;
 
@@ -437,7 +439,13 @@ export function GroupsView() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setCurrentView('chat')}
+                      onClick={() =>
+                        startDirectChat({
+                          name: friend.name,
+                          username: friend.username,
+                          avatarUrl: friend.avatarUrl,
+                        })
+                      }
                       className="px-3 py-1.5 rounded-full bg-[#F1F5F9] dark:bg-[#0F172A] hover:bg-slate-200 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5"
                     >
                       <MessageSquare className="w-3 h-3 text-slate-500" />

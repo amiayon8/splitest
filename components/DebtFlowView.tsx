@@ -31,6 +31,7 @@ import {
 export function DebtFlowView() {
   const {
     groups,
+    expenseGroups,
     activeGroupId,
     activeGroup,
     setActiveGroupId,
@@ -45,7 +46,9 @@ export function DebtFlowView() {
   } = useSplitest();
 
   const [selectedGroupId, setSelectedGroupId] = useState<string>(
-    activeGroupId || (groups[0]?.id || '')
+    expenseGroups.some((g) => g.id === activeGroupId)
+      ? activeGroupId
+      : expenseGroups[0]?.id || ''
   );
   const [calculationMode, setCalculationMode] = useState<'simplified' | 'direct'>('simplified');
   const [filterType, setFilterType] = useState<'all' | 'mine' | 'pay' | 'receive'>('all');
@@ -54,8 +57,8 @@ export function DebtFlowView() {
   const [remindedCreditors, setRemindedCreditors] = useState<Record<string, boolean>>({});
 
   const currentGroup = useMemo(() => {
-    return groups.find((g) => g.id === selectedGroupId) || activeGroup || groups[0];
-  }, [groups, selectedGroupId, activeGroup]);
+    return expenseGroups.find((g) => g.id === selectedGroupId) || expenseGroups[0];
+  }, [expenseGroups, selectedGroupId]);
 
   const groupCurrency = currentGroup?.defaultCurrency || 'USD';
 
@@ -219,7 +222,7 @@ export function DebtFlowView() {
                 aria-label="Select Group"
                 className="h-10 pl-3.5 pr-8 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#059669] appearance-none cursor-pointer"
               >
-                {groups.map((group) => (
+                {expenseGroups.map((group) => (
                   <option key={group.id} value={group.id} className="dark:bg-[#1E293B] dark:text-slate-100">
                     {group.name} ({group.members.length} members)
                   </option>

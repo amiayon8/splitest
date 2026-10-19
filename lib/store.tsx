@@ -33,6 +33,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 interface SplitestContextType {
   groups: Group[];
+  expenseGroups: Group[];
   activeGroupId: string;
   activeGroup: Group;
   setActiveGroupId: (id: string) => void;
@@ -142,6 +143,7 @@ interface SplitestContextType {
   allChatMessages: GroupChatMessage[];
   sendChatMessage: (data: { groupId: string; content: string; mentions?: string[]; attachment?: ChatAttachment }) => void;
   createGroupFromChat: (name: string, category: string, memberNames: string[]) => string;
+  startDirectChat: (friend: { name: string; username?: string; email?: string; avatarUrl?: string }) => string;
   addMembersToGroup: (groupId: string, newMemberNames: string[]) => void;
   addMemberByEmail: (groupId: string, email: string, role?: 'owner' | 'editor' | 'viewer') => Promise<{ success: boolean; message: string; member?: GroupMember }>;
   toggleChatMessageLike: (messageId: string) => void;
@@ -840,6 +842,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               ? item.user_role
               : 'editor',
           createdAt: item.created_at,
+          isDirectChat: Boolean(item.category === 'Direct' || item.id.startsWith('dm-')),
           members: rawMembers
             .filter((m) => m.group_id === item.id)
             .map((m) => {
@@ -1149,16 +1152,30 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isOnline]);
 
+  const expenseGroups = useMemo(() => {
+    return groups.filter((g) => !g.isDirectChat && g.category !== 'Direct' && !g.id.startsWith('dm-'));
+  }, [groups]);
+
   useEffect(() => {
-    if (groups.length > 0 && (!activeGroupId || !groups.some((g) => g.id === activeGroupId))) {
-      setActiveGroupId(groups[0].id);
+    if (currentView === 'chat') {
+      if (groups.length > 0 && (!activeGroupId || !groups.some((g) => g.id === activeGroupId))) {
+        setActiveGroupId(groups[0].id);
+      }
+    } else {
+      if (expenseGroups.length > 0 && (!activeGroupId || !expenseGroups.some((g) => g.id === activeGroupId))) {
+        setActiveGroupId(expenseGroups[0].id);
+      }
     }
-  }, [groups, activeGroupId]);
+  }, [groups, expenseGroups, activeGroupId, currentView]);
 
   const activeGroup = useMemo(() => {
-    if (groups.length === 0) return fallbackEmptyGroup;
-    return groups.find((item) => item.id === activeGroupId) || groups[0] || fallbackEmptyGroup;
-  }, [groups, activeGroupId]);
+    if (currentView === 'chat') {
+      if (groups.length === 0) return fallbackEmptyGroup;
+      return groups.find((item) => item.id === activeGroupId) || groups[0] || fallbackEmptyGroup;
+    }
+    if (expenseGroups.length === 0) return fallbackEmptyGroup;
+    return expenseGroups.find((item) => item.id === activeGroupId) || expenseGroups[0] || fallbackEmptyGroup;
+  }, [groups, expenseGroups, activeGroupId, currentView]);
 
   const activeCurrency = useMemo(() => {
     return activeGroup?.defaultCurrency || 'USD';
@@ -2190,6 +2207,120 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     [isOnline, refreshPendingCount, showToast, userProfile]
   );
 
+  const startDirectChat = useCallback(
+    (friend: { name: string; username?: string; email?: string; avatarUrl?: string }) => {
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const currentUserEmail = (userProfile.email || '').trim().toLowerCase();
+      const friendTargetName = (friend.name || friend.username || '').trim().toLowerCase();
+      const friendTargetEmail = (friend.email || '').trim().toLowerCase();
+
+      const existingChat = groups.find((g) => {
+        const isDm = g.isDirectChat || g.category === 'Direct' || g.id.startsWith('dm-');
+        if (!isDm) return false;
+        const hasFriend = g.members.some((m) => {
+          if (m.isCurrentUser) return false;
+          const memberName = (m.name || '').trim().toLowerCase();
+          const memberEmail = (m.email || '').trim().toLowerCase();
+          if (friendTargetEmail && memberEmail && memberEmail === friendTargetEmail) return true;
+          if (friendTargetName && memberName && memberName === friendTargetName) return true;
+          return false;
+        });
+        return hasFriend || g.name.trim().toLowerCase() === friendTargetName;
+      });
+
+      if (existingChat) {
+        setActiveGroupId(existingChat.id);
+        setCurrentView('chat');
+        return existingChat.id;
+      }
+
+      const newDmId = `dm-${Date.now()}`;
+      const nowIso = new Date().toISOString();
+      const friendDisplayName = friend.name || friend.username || 'Friend';
+      const newDmGroup: Group = {
+        id: newDmId,
+        name: friendDisplayName,
+        icon: 'User',
+        category: 'Direct',
+        description: 'Direct Message',
+        defaultCurrency: 'USD',
+        simplifyDebts: true,
+        userRole: 'owner',
+        createdAt: nowIso,
+        isDirectChat: true,
+        members: [
+          {
+            id: `member-${newDmId}-0`,
+            groupId: newDmId,
+            name: currentUserName,
+            email: currentUserEmail,
+            avatarUrl: userProfile.avatarUrl || '',
+            role: 'owner',
+            isCurrentUser: true,
+          },
+          {
+            id: `member-${newDmId}-1`,
+            groupId: newDmId,
+            name: friendDisplayName,
+            email: friend.email || '',
+            avatarUrl: friend.avatarUrl || '',
+            role: 'editor',
+            isCurrentUser: false,
+          },
+        ],
+      };
+
+      setGroups((prev) => {
+        const updated = [newDmGroup, ...prev];
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(STORAGE_GROUPS_KEY, JSON.stringify(updated));
+        }
+        void cacheItems('groups', updated);
+        return updated;
+      });
+
+      setActiveGroupId(newDmId);
+      setCurrentView('chat');
+
+      const client = getSupabaseClient();
+      if (client && isOnline) {
+        void client.from('groups').upsert({
+          id: newDmGroup.id,
+          name: newDmGroup.name,
+          icon: newDmGroup.icon,
+          category: newDmGroup.category,
+          description: newDmGroup.description,
+          default_currency: newDmGroup.defaultCurrency,
+          simplify_debts: newDmGroup.simplifyDebts,
+          user_role: newDmGroup.userRole,
+          created_by: userProfile.id || null,
+          created_at: newDmGroup.createdAt,
+        }).then(() => {
+          const membersToInsert = newDmGroup.members.map((m) => ({
+            id: m.id,
+            group_id: newDmGroup.id,
+            name: m.name,
+            email: m.email || '',
+            avatar_url: m.avatarUrl || '',
+            role: m.role,
+            is_current_user: false,
+          }));
+          return client.from('group_members').upsert(membersToInsert);
+        });
+      } else {
+        void queueMutation({
+          id: `mut-${Date.now()}`,
+          type: 'create_group',
+          payload: newDmGroup as unknown as Record<string, unknown>,
+          timestamp: nowIso,
+        }).then(() => refreshPendingCount());
+      }
+
+      return newDmId;
+    },
+    [groups, isOnline, refreshPendingCount, userProfile]
+  );
+
   const addMembersToGroup = useCallback(
     (groupId: string, newMemberNames: string[]) => {
       const group = groups.find((g) => g.id === groupId);
@@ -2606,6 +2737,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   const contextValue = useMemo(
     () => ({
       groups,
+      expenseGroups,
       activeGroupId,
       activeGroup,
       setActiveGroupId,
@@ -2685,6 +2817,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       allChatMessages,
       sendChatMessage,
       createGroupFromChat,
+      startDirectChat,
       addMembersToGroup,
       addMemberByEmail,
       toggleChatMessageLike,
@@ -2693,6 +2826,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       groups,
+      expenseGroups,
       activeGroupId,
       activeGroup,
       currentView,
@@ -2751,6 +2885,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       allChatMessages,
       sendChatMessage,
       createGroupFromChat,
+      startDirectChat,
       addMembersToGroup,
       addMemberByEmail,
       toggleChatMessageLike,

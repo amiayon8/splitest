@@ -28,6 +28,7 @@ import {
 export function Sidebar() {
   const {
     groups,
+    expenseGroups,
     activeGroupId,
     setActiveGroupId,
     currentView,
@@ -51,7 +52,7 @@ export function Sidebar() {
 
   const groupBalances = useMemo(() => {
     const balanceMap: Record<string, number> = {};
-    for (const group of groups) {
+    for (const group of expenseGroups) {
       const gExpenses = allExpenses.filter((item) => item.groupId === group.id);
       const gSettlements = allSettlements.filter(
         (item) => item.groupId === group.id,
@@ -145,7 +146,7 @@ export function Sidebar() {
 
         {isGroupsOpen && (
           <div className="space-y-1">
-            {groups.map((group) => {
+            {expenseGroups.map((group) => {
               const isSelected =
                 activeGroupId === group.id && currentView === "wallet";
               const balance = groupBalances[group.id] || 0;

@@ -17,7 +17,7 @@ import {
 
 export function WalletCardDeck() {
   const {
-    groups,
+    expenseGroups,
     activeGroupId,
     setActiveGroupId,
     allExpenses,
@@ -47,7 +47,7 @@ export function WalletCardDeck() {
 
   const currentIndex = Math.max(
     0,
-    groups.findIndex((g) => g.id === activeGroupId),
+    expenseGroups.findIndex((g) => g.id === activeGroupId),
   );
 
   const groupStats = useMemo(() => {
@@ -55,7 +55,7 @@ export function WalletCardDeck() {
       string,
       { net: number; youOwe: number; youAreOwed: number }
     > = {};
-    for (const group of groups) {
+    for (const group of expenseGroups) {
       const gExpenses = allExpenses.filter((item) => item.groupId === group.id);
       const gSettlements = allSettlements.filter(
         (item) => item.groupId === group.id,
@@ -100,7 +100,7 @@ export function WalletCardDeck() {
       };
     }
     return map;
-  }, [groups, allExpenses, allSettlements, userProfile]);
+  }, [expenseGroups, allExpenses, allSettlements, userProfile]);
 
   const centerCardInContainer = (index: number, behavior: ScrollBehavior = "smooth") => {
     const container = containerRef.current;
@@ -142,15 +142,15 @@ export function WalletCardDeck() {
       }
     });
 
-    if (closestIndex !== currentIndex && groups[closestIndex]) {
-      setActiveGroupId(groups[closestIndex].id);
+    if (closestIndex !== currentIndex && expenseGroups[closestIndex]) {
+      setActiveGroupId(expenseGroups[closestIndex].id);
     }
   };
 
   const scrollToCard = (index: number) => {
-    if (index < 0 || index >= groups.length) return;
+    if (index < 0 || index >= expenseGroups.length) return;
     isProgrammaticScrollRef.current = true;
-    setActiveGroupId(groups[index].id);
+    setActiveGroupId(expenseGroups[index].id);
     centerCardInContainer(index, "smooth");
 
     if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
@@ -218,7 +218,7 @@ export function WalletCardDeck() {
         const velocity = deltaX / duration;
 
         if (deltaX < -50 || velocity < -0.25) {
-          scrollToCard(Math.min(groups.length - 1, currentIndex + 1));
+          scrollToCard(Math.min(expenseGroups.length - 1, currentIndex + 1));
         } else if (deltaX > 50 || velocity > 0.25) {
           scrollToCard(Math.max(0, currentIndex - 1));
         } else if (currentContainer) {
@@ -258,7 +258,7 @@ export function WalletCardDeck() {
     scrollToCard(index);
   };
 
-  if (groups.length === 0) {
+  if (expenseGroups.length === 0) {
     return (
       <div className="w-full rounded-3xl p-8 border border-dashed border-slate-300 dark:border-slate-800 bg-white/50 dark:bg-[#1E293B]/40 flex flex-col items-center justify-center text-center gap-3 select-none">
         <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-[#059669] dark:text-[#34D399] flex items-center justify-center">
@@ -298,7 +298,7 @@ export function WalletCardDeck() {
         <button
           type="button"
           onClick={() => scrollToCard(currentIndex + 1)}
-          disabled={currentIndex === groups.length - 1}
+          disabled={currentIndex === expenseGroups.length - 1}
           className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 dark:bg-[#1E293B]/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-md text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 hover:scale-105 active:scale-95 disabled:opacity-0 disabled:pointer-events-none transition-all items-center justify-center"
           aria-label="Next card"
         >
@@ -314,7 +314,7 @@ export function WalletCardDeck() {
           }`}
           style={{ scrollPaddingLeft: "1rem", scrollPaddingRight: "1rem" }}
         >
-          {groups.map((group, index) => {
+          {expenseGroups.map((group, index) => {
             const isSelected = index === currentIndex;
             const stats = groupStats[group.id] || {
               net: 0,
@@ -499,7 +499,7 @@ export function WalletCardDeck() {
       </div>
 
       <div className="flex items-center justify-center gap-1.5 pt-1">
-        {groups.map((group, index) => {
+        {expenseGroups.map((group, index) => {
           const isSelected = index === currentIndex;
           return (
             <button
