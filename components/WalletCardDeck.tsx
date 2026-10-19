@@ -13,6 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
+  Bell,
+  BellOff,
 } from "lucide-react";
 
 export function WalletCardDeck() {
@@ -29,6 +31,8 @@ export function WalletCardDeck() {
     setIsNewGroupModalOpen,
     activeCurrency,
     userProfile,
+    toggleLedgerNotifications,
+    mutedLedgerIds,
   } = useSplitest();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -383,15 +387,46 @@ export function WalletCardDeck() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 p-1 rounded-full bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        navigator.vibrate?.(10);
+                        toggleLedgerNotifications(group.id);
+                      }}
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all active:scale-85 ${
+                        mutedLedgerIds.includes(group.id)
+                          ? "bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400"
+                          : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-700/80"
+                      }`}
+                      aria-label={
+                        mutedLedgerIds.includes(group.id)
+                          ? "Unmute ledger notifications"
+                          : "Mute ledger notifications"
+                      }
+                      title={
+                        mutedLedgerIds.includes(group.id)
+                          ? "Ledger alerts muted (click to unmute)"
+                          : "Ledger alerts active (click to mute)"
+                      }
+                    >
+                      {mutedLedgerIds.includes(group.id) ? (
+                        <BellOff className="w-3.5 h-3.5" />
+                      ) : (
+                        <Bell className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.vibrate?.(10);
                         setActiveGroupId(group.id);
                         setIsLedgerSettingsModalOpen(true);
                       }}
-                      className="w-8 h-8 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-700/80 flex items-center justify-center transition-all active:scale-85"
                       aria-label="Ledger Settings"
                       title="Ledger Settings"
                     >
@@ -402,11 +437,13 @@ export function WalletCardDeck() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        navigator.vibrate?.(10);
                         setActiveGroupId(group.id);
                         setIsShareModalOpen(true);
                       }}
-                      className="w-8 h-8 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-700/80 flex items-center justify-center transition-all active:scale-85"
                       aria-label="Share group"
+                      title="Share group"
                     >
                       <Share2 className="w-3.5 h-3.5" />
                     </button>
@@ -469,10 +506,11 @@ export function WalletCardDeck() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        navigator.vibrate?.(10);
                         setActiveGroupId(group.id);
                         setIsAddExpenseModalOpen(true);
                       }}
-                      className="flex-1 h-10 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
+                      className="flex-1 h-10 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                       <span>Add Expense</span>
@@ -482,10 +520,11 @@ export function WalletCardDeck() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        navigator.vibrate?.(10);
                         setActiveGroupId(group.id);
                         setIsSettleModalOpen(true);
                       }}
-                      className="flex-1 h-10 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-98"
+                      className="flex-1 h-10 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-95"
                     >
                       <Handshake className="w-3.5 h-3.5 text-[#059669] dark:text-[#10B981]" />
                       <span>Settle Up</span>

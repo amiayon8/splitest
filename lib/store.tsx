@@ -12,6 +12,7 @@ import {
   ChatAttachment,
   ThemeMode,
   FriendContact,
+  InAppNotification,
 } from '@/types';
 import { getSupabaseClient, saveSupabaseConfig } from '@/lib/supabase';
 import { findUserByUsername, fetchUserProfileFromDatabase, validateUsernameFormat } from '@/lib/users-directory';
@@ -139,6 +140,25 @@ interface SplitestContextType {
   syncGoogleAccount: () => Promise<boolean>;
   disconnectGoogleAccount: () => void;
   sendTestNotification: () => Promise<boolean>;
+  notifications: InAppNotification[];
+  unreadNotificationsCount: number;
+  isNotificationCenterOpen: boolean;
+  setIsNotificationCenterOpen: (open: boolean) => void;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearNotifications: () => void;
+  deleteNotification: (id: string) => void;
+  pushNotification: (notification: {
+    type: InAppNotification['type'];
+    title: string;
+    body: string;
+    groupId?: string;
+    expenseId?: string;
+    actorEmail?: string;
+    actorName?: string;
+  }) => void;
+  toggleLedgerNotifications: (groupId: string) => boolean;
+  mutedLedgerIds: string[];
   chatMessages: GroupChatMessage[];
   allChatMessages: GroupChatMessage[];
   sendChatMessage: (data: { groupId: string; content: string; mentions?: string[]; attachment?: ChatAttachment; senderName?: string }) => void;
@@ -161,6 +181,8 @@ const STORAGE_PROFILE_KEY = 'splitest_local_profile';
 const STORAGE_CHAT_KEY = 'splitest_local_chat';
 const STORAGE_THEME_KEY = 'splitest_theme_preference';
 const STORAGE_FRIENDS_KEY = 'splitest_local_friends';
+const STORAGE_NOTIFICATIONS_KEY = 'splitest_local_notifications';
+const STORAGE_MUTED_GROUPS_KEY = 'splitest_local_muted_groups';
 
 const initialProfile: UserProfile = {
   id: '',
@@ -194,6 +216,56 @@ const fallbackEmptyGroup: Group = {
   createdAt: '',
   members: [],
 };
+
+const initialNotifications: InAppNotification[] = [
+  {
+    id: 'notif-1',
+    type: 'expense',
+    title: 'New Expense Added',
+    body: 'Groceries & Supplies ($128.40) added to Household ledger',
+    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    read: false,
+  },
+  {
+    id: 'notif-2',
+    type: 'settlement',
+    title: 'Settlement Confirmed',
+    body: 'Payment of $42.00 settled via Venmo',
+    timestamp: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
+    read: false,
+  },
+  {
+    id: 'notif-3',
+    type: 'system',
+    title: 'Realtime Alerts Active',
+    body: 'Browser push notifications and mobile sound chimes are enabled.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
+    read: true,
+  },
+];
+
+function playNotificationChime() {
+  try {
+    if (typeof window === 'undefined') return;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(587.33, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 0.12);
+    gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.35);
+  } catch {
+  }
+}
 
 export function SplitestProvider({ children }: { children: React.ReactNode }) {
   const isOnline = useOnlineStatus();
@@ -311,6 +383,27 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   const [isLedgerSettingsModalOpen, setIsLedgerSettingsModalOpen] = useState<boolean>(false);
   const [isShareProfileModalOpen, setIsShareProfileModalOpen] = useState<boolean>(false);
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState<boolean>(false);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<InAppNotification[]>(() => {
+    if (typeof window === 'undefined') return initialNotifications;
+    try {
+      const stored = window.localStorage.getItem(STORAGE_NOTIFICATIONS_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch {
+      return initialNotifications;
+    }
+    return initialNotifications;
+  });
+  const [mutedLedgerIds, setMutedLedgerIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = window.localStorage.getItem(STORAGE_MUTED_GROUPS_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch {
+      return [];
+    }
+    return [];
+  });
   const [segment, setSegment] = useState<'groups' | 'friends'>('groups');
   const [settlePrefill, setSettlePrefill] = useState<{ recipient: string; amount: number } | null>(null);
   const [isNewGroupModalOpen, setIsNewGroupModalOpen] = useState<boolean>(false);
@@ -425,7 +518,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               currency_code: exp.currencyCode || 'USD',
               exchange_rate_to_group: exp.exchangeRateToGroup || 1.0,
               category: exp.category,
-              paid_by_name: exp.paidByName,
+              paid_by_email: exp.paidByEmail,
               split_method: exp.splitMethod,
               date: exp.date,
               has_receipt: exp.hasReceipt,
@@ -437,7 +530,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               const splitsPayload = exp.splits.map((s) => ({
                 id: s.id,
                 expense_id: exp.id,
-                member_name: s.memberName,
+                member_email: s.memberEmail,
                 share_amount: s.shareAmount,
                 percentage: s.percentage || null,
                 shares: s.shares || null,
@@ -454,7 +547,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
                 description: exp.description,
                 amount: exp.amount,
                 category: exp.category,
-                paid_by_name: exp.paidByName,
+                paid_by_email: exp.paidByEmail,
                 split_method: exp.splitMethod,
                 has_receipt: exp.hasReceipt,
               })
@@ -466,7 +559,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               const splitsPayload = exp.splits.map((s) => ({
                 id: s.id,
                 expense_id: exp.id,
-                member_name: s.memberName,
+                member_email: s.memberEmail,
                 share_amount: s.shareAmount,
                 percentage: s.percentage || null,
                 shares: s.shares || null,
@@ -485,8 +578,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             const { error } = await client.from('settlements').upsert({
               id: set.id,
               group_id: set.groupId,
-              payer_name: set.payerName,
-              recipient_name: set.recipientName,
+              payer_email: set.payerEmail,
+              recipient_email: set.recipientEmail,
               amount: set.amount,
               currency_code: set.currencyCode || 'USD',
               method: set.method,
@@ -497,6 +590,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           }
           case 'create_group': {
             const grp = mutation.payload as unknown as Group;
+            const creatorEmail = grp.members.find((m) => m.role === 'owner')?.email || null;
             const { error: grpError } = await client.from('groups').upsert({
               id: grp.id,
               name: grp.name,
@@ -506,6 +600,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               default_currency: grp.defaultCurrency,
               simplify_debts: grp.simplifyDebts,
               user_role: grp.userRole,
+              created_by: creatorEmail,
               created_at: grp.createdAt,
             });
             if (grpError) return false;
@@ -514,9 +609,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               const membersPayload = grp.members.map((m) => ({
                 id: m.id,
                 group_id: grp.id,
-                name: m.name,
                 email: m.email,
-                avatar_url: m.avatarUrl,
                 role: m.role,
                 is_current_user: false,
               }));
@@ -548,8 +641,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             const { error } = await client.from('chat_messages').upsert({
               id: chat.id,
               group_id: chat.groupId,
-              sender_name: chat.senderName,
-              sender_avatar_url: chat.senderAvatarUrl,
+              sender_email: chat.senderEmail,
               sender_is_current_user: chat.senderIsCurrentUser,
               content: chat.content,
               mentions: chat.mentions || [],
@@ -570,12 +662,12 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           case 'add_comment': {
             const { expenseId, comment } = mutation.payload as {
               expenseId: string;
-              comment: { id: string; authorName: string; content: string; createdAt: string };
+              comment: { id: string; authorEmail?: string; content: string; createdAt: string };
             };
             const { error } = await client.from('comments').upsert({
               id: comment.id,
               expense_id: expenseId,
-              author_name: comment.authorName,
+              author_email: comment.authorEmail || userProfile.email,
               content: comment.content,
               created_at: comment.createdAt,
             });
@@ -607,11 +699,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             const friend = mutation.payload as unknown as FriendContact;
             const { error } = await client.from('friends').upsert({
               id: friend.id,
-              name: friend.name,
-              username: friend.username,
+              user_email: userProfile.email,
               email: friend.email,
-              avatar_url: friend.avatarUrl,
-              phone: '',
               added_via: friend.addedVia || 'directory',
             });
             return !error;
@@ -681,17 +770,26 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      const cleanAuthEmail = (authUser.email || '').trim().toLowerCase();
       const { data: profileRecord } = await client
         .from('profiles')
         .select('*')
-        .eq('id', authUser.id)
+        .or(`id.eq.${authUser.id},email.eq.${cleanAuthEmail}`)
         .maybeSingle();
 
       let effectiveProfile: UserProfile;
 
       if (profileRecord) {
+        if (profileRecord.id !== authUser.id) {
+          await client.from('profiles').update({
+            id: authUser.id,
+            google_connected: !!authUser.app_metadata?.provider?.includes('google'),
+            google_email: authUser.app_metadata?.provider?.includes('google') ? authUser.email : profileRecord.google_email,
+          }).eq('email', cleanAuthEmail);
+        }
+
         effectiveProfile = {
-          id: profileRecord.id,
+          id: authUser.id,
           email: profileRecord.email || authUser.email || '',
           fullName: profileRecord.full_name || authUser.user_metadata?.full_name || '',
           username: profileRecord.username || '',
@@ -717,7 +815,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         const initialUsername = initialName.toLowerCase().replace(/[^a-z0-9]/g, '.');
         const newProfile = {
           id: authUser.id,
-          email: authUser.email || '',
+          email: cleanAuthEmail,
           full_name: initialName,
           username: initialUsername,
           avatar_url: '',
@@ -761,40 +859,52 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       }
 
       const userEmail = (effectiveProfile.email || authUser.email || '').trim().toLowerCase();
-      const userFullName = (effectiveProfile.fullName || authUser.user_metadata?.full_name || '').trim().toLowerCase();
-      const userHandle = (effectiveProfile.username || '').trim().toLowerCase();
 
       const [createdGroupsRes, allMembersRes, userFriendsRes, allProfilesRes] = await Promise.all([
-        client.from('groups').select('*').eq('created_by', authUser.id),
+        client.from('groups').select('*').or(`created_by.eq.${userEmail},created_by.eq.${authUser.id}`),
         client.from('group_members').select('*'),
-        client.from('friends').select('*').or(`phone.eq.${authUser.id},phone.is.null`).order('created_at', { ascending: false }),
-        client.from('profiles').select('id, email, username, full_name, avatar_url'),
+        client.from('friends').select('*').eq('user_email', userEmail).order('created_at', { ascending: false }),
+        client.from('profiles').select('id, email, username, full_name, avatar_url, phone'),
       ]);
 
       const profileList = allProfilesRes.data || [];
-      const profileById = new Map<string, string>();
-      const profileByEmail = new Map<string, string>();
-      const profileByUsername = new Map<string, string>();
-      const profileByName = new Map<string, string>();
+      const profileMapByEmail = new Map<string, { id: string; email: string; fullName: string; username: string; avatarUrl: string; phone: string }>();
 
       profileList.forEach((p) => {
-        const avatar = (p.avatar_url || '').trim();
-        if (!avatar) return;
-        if (p.id) profileById.set(p.id, avatar);
-        if (p.email) profileByEmail.set(p.email.trim().toLowerCase(), avatar);
-        if (p.username) profileByUsername.set(p.username.trim().toLowerCase(), avatar);
-        if (p.full_name) profileByName.set(p.full_name.trim().toLowerCase(), avatar);
+        const emailKey = (p.email || '').trim().toLowerCase();
+        if (!emailKey) return;
+        profileMapByEmail.set(emailKey, {
+          id: p.id || '',
+          email: emailKey,
+          fullName: p.full_name || '',
+          username: p.username || '',
+          avatarUrl: p.avatar_url || '',
+          phone: p.phone || '',
+        });
       });
 
-      const resolveProfileAvatar = (params: { id?: string; email?: string; username?: string; name?: string }) => {
-        if (params.id && profileById.has(params.id)) return profileById.get(params.id)!;
-        const cleanEmail = (params.email || '').trim().toLowerCase();
-        if (cleanEmail && profileByEmail.has(cleanEmail)) return profileByEmail.get(cleanEmail)!;
-        const cleanUsername = (params.username || '').trim().toLowerCase();
-        if (cleanUsername && profileByUsername.has(cleanUsername)) return profileByUsername.get(cleanUsername)!;
-        const cleanName = (params.name || '').trim().toLowerCase();
-        if (cleanName && profileByName.has(cleanName)) return profileByName.get(cleanName)!;
-        return '';
+      const resolveProfile = (rawEmail?: string) => {
+        const emailKey = (rawEmail || '').trim().toLowerCase();
+        const prof = emailKey ? profileMapByEmail.get(emailKey) : undefined;
+        const isSelf = Boolean(userEmail && emailKey && emailKey === userEmail);
+
+        const name = isSelf
+          ? (effectiveProfile.fullName || prof?.fullName || effectiveProfile.username || emailKey.split('@')[0] || 'User')
+          : (prof?.fullName || prof?.username || (emailKey ? emailKey.split('@')[0] : 'User'));
+
+        const username = isSelf
+          ? (effectiveProfile.username || prof?.username || (emailKey ? emailKey.split('@')[0] : 'user'))
+          : (prof?.username || (emailKey ? emailKey.split('@')[0] : 'user'));
+
+        const avatarUrl = isSelf
+          ? (effectiveProfile.avatarUrl || prof?.avatarUrl || (emailKey ? `https://www.gravatar.com/avatar/${emailKey}?s=160&d=mp` : ''))
+          : (prof?.avatarUrl || (emailKey ? `https://www.gravatar.com/avatar/${emailKey}?s=160&d=mp` : ''));
+
+        const phone = isSelf
+          ? (effectiveProfile.phone || prof?.phone || '')
+          : (prof?.phone || '');
+
+        return { name, username, avatarUrl, phone, email: emailKey };
       };
 
       const rawMembers = allMembersRes.data || [];
@@ -804,31 +914,25 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
       rawMembers.forEach((m) => {
         const mEmail = (m.email || '').trim().toLowerCase();
-        const mName = (m.name || '').trim().toLowerCase();
-
-        if (
-          (userEmail && mEmail === userEmail) ||
-          (userFullName && mName === userFullName) ||
-          (userHandle && mName === userHandle)
-        ) {
+        if (userEmail && mEmail === userEmail) {
           userGroupIds.add(m.group_id);
         }
       });
 
-      const builtFriends: FriendContact[] = (userFriendsRes.data || []).map((f) => ({
-        id: f.id,
-        name: f.name,
-        username: f.username || f.name.toLowerCase().replace(/[^a-z0-9]/g, '.'),
-        email: f.email || '',
-        avatarUrl: resolveProfileAvatar({
-          email: f.email || '',
-          username: f.username || '',
-          name: f.name || '',
-        }),
-        netBalance: Number(f.net_balance) || 0,
-        groupCount: Number(f.group_count) || 0,
-        addedVia: f.added_via || 'directory',
-      }));
+      const builtFriends: FriendContact[] = (userFriendsRes.data || []).map((f) => {
+        const prof = resolveProfile(f.email);
+        return {
+          id: f.id,
+          email: f.email,
+          name: prof.name,
+          username: prof.username,
+          avatarUrl: prof.avatarUrl,
+          phone: prof.phone,
+          netBalance: Number(f.net_balance) || 0,
+          groupCount: Number(f.group_count) || 0,
+          addedVia: f.added_via || 'directory',
+        };
+      });
 
       if (userGroupIds.size === 0) {
         setGroups([]);
@@ -855,14 +959,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         .filter((item) => item.id !== 'group-bali-retreat')
         .map((item) => {
           const groupSpecificMembers = rawMembers.filter((m) => m.group_id === item.id);
-          const isCreator = Boolean(item.created_by && effectiveProfile.id && item.created_by === effectiveProfile.id);
+          const isCreator = Boolean(
+            (item.created_by && item.created_by === userEmail) ||
+            (item.created_by && effectiveProfile.id && item.created_by === effectiveProfile.id)
+          );
           const hasOwnerRole = groupSpecificMembers.some((m) => {
             const memberEmail = (m.email || '').trim().toLowerCase();
-            const memberName = (m.name || '').trim().toLowerCase();
-            const isMatch = (userEmail && memberEmail && memberEmail === userEmail) ||
-              (userFullName && memberName && memberName === userFullName) ||
-              (userHandle && memberName && memberName === userHandle);
-            return isMatch && m.role === 'owner';
+            return userEmail && memberEmail && memberEmail === userEmail && m.role === 'owner';
           });
           const resolvedUserRole = (item.user_role === 'owner' || isCreator || hasOwnerRole)
             ? 'owner'
@@ -882,39 +985,17 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             createdAt: item.created_at,
             isDirectChat: Boolean(item.category === 'Direct' || item.id.startsWith('dm-')),
             members: groupSpecificMembers.map((m) => {
-              const memberEmail = (m.email || '').trim().toLowerCase();
-              const memberName = (m.name || '').trim().toLowerCase();
-
-              const isMatchByEmail = Boolean(userEmail && memberEmail && memberEmail === userEmail);
-              const isMatchByName = Boolean(userFullName && memberName && memberName === userFullName);
-              const isMatchByHandle = Boolean(userHandle && memberName && memberName === userHandle);
-              const isCurrent = isMatchByEmail || (!memberEmail && (isMatchByName || isMatchByHandle));
-
-              const realName =
-                m.name === 'You' && isCurrent
-                  ? effectiveProfile.fullName || effectiveProfile.username || 'User'
-                  : m.name;
-
-              if (m.name === 'You' && isCurrent) {
-                void client.from('group_members').update({
-                  name: realName,
-                  email: effectiveProfile.email,
-                }).eq('id', m.id);
-              }
-
-              const memberAvatar = isCurrent
-                ? (effectiveProfile.avatarUrl || '')
-                : resolveProfileAvatar({
-                    email: m.email || '',
-                    name: realName,
-                  });
+              const prof = resolveProfile(m.email);
+              const isCurrent = Boolean(userEmail && m.email && m.email.trim().toLowerCase() === userEmail);
 
               return {
                 id: m.id,
                 groupId: m.group_id,
-                name: realName,
-                email: m.email || (isCurrent ? effectiveProfile.email : ''),
-                avatarUrl: memberAvatar,
+                email: m.email,
+                name: isCurrent ? (effectiveProfile.fullName || prof.name) : prof.name,
+                username: isCurrent ? (effectiveProfile.username || prof.username) : prof.username,
+                avatarUrl: isCurrent ? (effectiveProfile.avatarUrl || prof.avatarUrl) : prof.avatarUrl,
+                phone: isCurrent ? (effectiveProfile.phone || prof.phone) : prof.phone,
                 role: m.role === 'owner' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'editor',
                 isCurrentUser: isCurrent,
               };
@@ -928,14 +1009,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const builtExpenses: Expense[] = (expensesRes.data || [])
         .filter((exp) => exp.group_id !== 'group-bali-retreat')
         .map((exp) => {
-          const isPayerCurrent =
-            exp.paid_by_name === 'You' ||
-            exp.paid_by_name === effectiveProfile.fullName ||
-            exp.paid_by_name === effectiveProfile.username;
-          const resolvedPayerName =
-            exp.paid_by_name === 'You' && isPayerCurrent
-              ? effectiveProfile.fullName || effectiveProfile.username || 'User'
-              : exp.paid_by_name || 'User';
+          const payerProfile = resolveProfile(exp.paid_by_email);
+          const isPayerCurrent = Boolean(
+            userEmail && exp.paid_by_email && exp.paid_by_email.trim().toLowerCase() === userEmail
+          );
+          const resolvedPayerName = isPayerCurrent
+            ? (effectiveProfile.fullName || payerProfile.name)
+            : payerProfile.name;
 
           return {
             id: exp.id,
@@ -945,6 +1025,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             currencyCode: exp.currency_code || 'USD',
             exchangeRateToGroup: Number(exp.exchange_rate_to_group) || 1.0,
             category: exp.category,
+            paidByEmail: exp.paid_by_email,
             paidByName: resolvedPayerName,
             splitMethod: exp.split_method || 'equal',
             date: exp.date,
@@ -952,86 +1033,97 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             createdAt: exp.created_at,
             splits: fetchedSplits
               .filter((s) => s.expense_id === exp.id)
-              .map((s) => ({
-                id: s.id,
-                expenseId: s.expense_id,
-                memberName:
-                  s.member_name === 'You'
-                    ? effectiveProfile.fullName || effectiveProfile.username || 'User'
-                    : s.member_name,
-                shareAmount: Number(s.share_amount),
-                percentage: s.percentage ? Number(s.percentage) : undefined,
-                shares: s.shares ? Number(s.shares) : undefined,
-              })),
+              .map((s) => {
+                const memberProfile = resolveProfile(s.member_email);
+                const isSplitCurrent = Boolean(
+                  userEmail && s.member_email && s.member_email.trim().toLowerCase() === userEmail
+                );
+                return {
+                  id: s.id,
+                  expenseId: s.expense_id,
+                  memberEmail: s.member_email,
+                  memberName: isSplitCurrent
+                    ? (effectiveProfile.fullName || memberProfile.name)
+                    : memberProfile.name,
+                  shareAmount: Number(s.share_amount),
+                  percentage: s.percentage ? Number(s.percentage) : undefined,
+                  shares: s.shares ? Number(s.shares) : undefined,
+                };
+              }),
             comments: fetchedComments
               .filter((c) => c.expense_id === exp.id)
-              .map((c) => ({
-                id: c.id,
-                expenseId: c.expense_id,
-                authorName:
-                  c.author_name === 'You'
-                    ? effectiveProfile.fullName || effectiveProfile.username || 'User'
-                    : c.author_name,
-                content: c.content,
-                createdAt: c.created_at,
-              })),
+              .map((c) => {
+                const authorProfile = resolveProfile(c.author_email);
+                const isAuthorCurrent = Boolean(
+                  userEmail && c.author_email && c.author_email.trim().toLowerCase() === userEmail
+                );
+                return {
+                  id: c.id,
+                  expenseId: c.expense_id,
+                  authorEmail: c.author_email,
+                  authorName: isAuthorCurrent
+                    ? (effectiveProfile.fullName || authorProfile.name)
+                    : authorProfile.name,
+                  content: c.content,
+                  createdAt: c.created_at,
+                };
+              }),
           };
         });
 
       const builtSettlements: Settlement[] = (settlementsRes.data || [])
         .filter((set) => set.group_id !== 'group-bali-retreat')
-        .map((set) => ({
-          id: set.id,
-          groupId: set.group_id,
-          payerName:
-            set.payer_name === 'You'
-              ? effectiveProfile.fullName || effectiveProfile.username || 'User'
-              : set.payer_name,
-          recipientName:
-            set.recipient_name === 'You'
-              ? effectiveProfile.fullName || effectiveProfile.username || 'User'
-              : set.recipient_name,
-          amount: Number(set.amount),
-          currencyCode: set.currency_code || 'USD',
-          method: set.method,
-          notes: set.notes,
-          createdAt: set.created_at,
-        }));
+        .map((set) => {
+          const payerProfile = resolveProfile(set.payer_email);
+          const recipientProfile = resolveProfile(set.recipient_email);
+          const isPayerCurrent = Boolean(
+            userEmail && set.payer_email && set.payer_email.trim().toLowerCase() === userEmail
+          );
+          const isRecipientCurrent = Boolean(
+            userEmail && set.recipient_email && set.recipient_email.trim().toLowerCase() === userEmail
+          );
+          return {
+            id: set.id,
+            groupId: set.group_id,
+            payerEmail: set.payer_email,
+            recipientEmail: set.recipient_email,
+            payerName: isPayerCurrent
+              ? (effectiveProfile.fullName || payerProfile.name)
+              : payerProfile.name,
+            recipientName: isRecipientCurrent
+              ? (effectiveProfile.fullName || recipientProfile.name)
+              : recipientProfile.name,
+            amount: Number(set.amount),
+            currencyCode: set.currency_code || 'USD',
+            method: set.method,
+            notes: set.notes,
+            createdAt: set.created_at,
+          };
+        });
 
       const builtChatMessages: GroupChatMessage[] = (chatRes.data || [])
         .filter((c) => c.group_id !== 'group-bali-retreat')
         .map((c) => {
-          const rawSender = (c.sender_name || '').trim().toLowerCase();
-          const currentFullName = (effectiveProfile.fullName || '').trim().toLowerCase();
-          const currentUsername = (effectiveProfile.username || '').trim().toLowerCase();
-          const currentHandle = (effectiveProfile.paymentHandle || '').trim().toLowerCase();
-
-          const isSenderCurrent =
-            rawSender === 'you' ||
-            (currentFullName !== '' && rawSender === currentFullName) ||
-            (currentUsername !== '' && rawSender === currentUsername) ||
-            (currentHandle !== '' && rawSender === currentHandle);
-
-          const chatSenderAvatar = isSenderCurrent
-            ? (effectiveProfile.avatarUrl || '')
-            : resolveProfileAvatar({
-                username: c.sender_name,
-                name: c.sender_name,
-              });
+          const senderProfile = resolveProfile(c.sender_email);
+          const isSenderCurrent = Boolean(
+            userEmail && c.sender_email && c.sender_email.trim().toLowerCase() === userEmail
+          );
 
           return {
             id: c.id,
             groupId: c.group_id,
-            senderName:
-              c.sender_name === 'You'
-                ? effectiveProfile.fullName || effectiveProfile.username || 'User'
-                : c.sender_name,
-            senderAvatarUrl: chatSenderAvatar,
+            senderEmail: c.sender_email,
+            senderName: isSenderCurrent
+              ? (effectiveProfile.fullName || senderProfile.name)
+              : senderProfile.name,
+            senderAvatarUrl: isSenderCurrent
+              ? (effectiveProfile.avatarUrl || senderProfile.avatarUrl)
+              : senderProfile.avatarUrl,
             senderIsCurrentUser: isSenderCurrent,
             content: c.content,
-            mentions: c.mentions || [],
+            mentions: Array.isArray(c.mentions) ? c.mentions : [],
             attachment: c.attachment || undefined,
-            likes: c.likes || [],
+            likes: Array.isArray(c.likes) ? c.likes : [],
             createdAt: c.created_at,
           };
         });
@@ -1260,6 +1352,182 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     return allSettlements.filter((item) => item.groupId === activeGroupId);
   }, [allSettlements, activeGroupId]);
 
+  const unreadNotificationsCount = useMemo(() => {
+    return notifications.filter((n) => !n.read).length;
+  }, [notifications]);
+
+  const markNotificationAsRead = useCallback((id: string) => {
+    setNotifications((prev) => {
+      const next = prev.map((item) => (item.id === id ? { ...item, read: true } : item));
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(STORAGE_NOTIFICATIONS_KEY, JSON.stringify(next));
+        } catch {
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    setNotifications((prev) => {
+      const next = prev.map((item) => ({ ...item, read: true }));
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(STORAGE_NOTIFICATIONS_KEY, JSON.stringify(next));
+        } catch {
+        }
+      }
+      return next;
+    });
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(8);
+      } catch {
+      }
+    }
+    showToast('All notifications marked as read');
+  }, [showToast]);
+
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.removeItem(STORAGE_NOTIFICATIONS_KEY);
+      } catch {
+      }
+    }
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(8);
+      } catch {
+      }
+    }
+    showToast('Notifications cleared');
+  }, [showToast]);
+
+  const deleteNotification = useCallback((id: string) => {
+    setNotifications((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(STORAGE_NOTIFICATIONS_KEY, JSON.stringify(next));
+        } catch {
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const pushNotification = useCallback(
+    (data: {
+      type: InAppNotification['type'];
+      title: string;
+      body: string;
+      groupId?: string;
+      expenseId?: string;
+      actorEmail?: string;
+      actorName?: string;
+    }) => {
+      if (data.groupId && mutedLedgerIds.includes(data.groupId)) {
+        return;
+      }
+
+      if (!userProfile.notificationsEnabled) {
+        return;
+      }
+
+      if (data.type === 'expense' && !userProfile.notifyOnExpense) {
+        return;
+      }
+      if (data.type === 'settlement' && !userProfile.notifyOnSettlement) {
+        return;
+      }
+      if (data.type === 'chat' && !userProfile.notifyOnMention) {
+        return;
+      }
+
+      const newNotification: InAppNotification = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: data.type,
+        title: data.title,
+        body: data.body,
+        timestamp: new Date().toISOString(),
+        read: false,
+        groupId: data.groupId,
+        expenseId: data.expenseId,
+        actorEmail: data.actorEmail,
+        actorName: data.actorName,
+      };
+
+      setNotifications((prev) => {
+        const next = [newNotification, ...prev].slice(0, 50);
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(STORAGE_NOTIFICATIONS_KEY, JSON.stringify(next));
+          } catch {
+          }
+        }
+        return next;
+      });
+
+      playNotificationChime();
+
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate([15, 30, 20]);
+        } catch {
+        }
+      }
+
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(data.title, {
+            body: data.body,
+            icon: '/Splitest.svg',
+          });
+        } catch {
+        }
+      }
+    },
+    [mutedLedgerIds, userProfile]
+  );
+
+  const toggleLedgerNotifications = useCallback(
+    (groupId: string) => {
+      let isNowMuted = false;
+      setMutedLedgerIds((prev) => {
+        const exists = prev.includes(groupId);
+        isNowMuted = !exists;
+        const next = exists ? prev.filter((id) => id !== groupId) : [...prev, groupId];
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(STORAGE_MUTED_GROUPS_KEY, JSON.stringify(next));
+          } catch {
+          }
+        }
+        return next;
+      });
+
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate(10);
+        } catch {
+        }
+      }
+
+      const group = groups.find((g) => g.id === groupId);
+      const groupName = group?.name || 'Ledger';
+      if (isNowMuted) {
+        showToast(`Muted notifications for ${groupName}`);
+      } else {
+        showToast(`Enabled notifications for ${groupName}`);
+      }
+      return !isNowMuted;
+    },
+    [groups, showToast]
+  );
+
   const selectedExpense = useMemo(() => {
     if (!selectedExpenseId) return expenses[0] || null;
     return expenses.find((item) => item.id === selectedExpenseId) || expenses[0] || null;
@@ -1290,6 +1558,14 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
       const targetGroup = groups.find((g) => g.id === expenseData.groupId);
       const groupCurrency = targetGroup?.defaultCurrency || 'USD';
+      const payerMember = targetGroup?.members.find(
+        (m) => m.name === resolvedPaidByName || m.email === resolvedPaidByName
+      );
+      const resolvedPaidByEmail = (
+        payerMember?.email ||
+        (resolvedPaidByName.includes('@') ? resolvedPaidByName : userProfile.email) ||
+        ''
+      ).trim().toLowerCase();
 
       const newExpense: Expense = {
         id: newId,
@@ -1299,21 +1575,34 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         currencyCode: groupCurrency,
         exchangeRateToGroup: 1.0,
         category: expenseData.category,
+        paidByEmail: resolvedPaidByEmail,
         paidByName: resolvedPaidByName,
         splitMethod: expenseData.splitMethod,
         date: expenseData.date,
         hasReceipt: expenseData.hasReceipt,
-        splits: expenseData.splits.map((split, index) => ({
-          id: `split-${newId}-${index}`,
-          expenseId: newId,
-          memberName:
-            !split.memberName || split.memberName === 'You'
-              ? currentUserName
-              : split.memberName,
-          shareAmount: Number(split.shareAmount),
-          percentage: split.percentage,
-          shares: split.shares,
-        })),
+        splits: expenseData.splits.map((split, index) => {
+          const splitName = !split.memberName || split.memberName === 'You'
+            ? currentUserName
+            : split.memberName;
+          const memberObj = targetGroup?.members.find(
+            (m) => m.name === splitName || m.email === splitName
+          );
+          const memberEmail = (
+            memberObj?.email ||
+            (splitName.includes('@') ? splitName : userProfile.email) ||
+            ''
+          ).trim().toLowerCase();
+
+          return {
+            id: `split-${newId}-${index}`,
+            expenseId: newId,
+            memberEmail,
+            memberName: splitName,
+            shareAmount: Number(split.shareAmount),
+            percentage: split.percentage,
+            shares: split.shares,
+          };
+        }),
         comments: [],
         createdAt: nowIso,
       };
@@ -1337,6 +1626,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       saveToLocalStorage(updatedExpenses, allSettlements, groups, updatedActivities);
       broadcastLocalEvent('expense_added', newExpense);
 
+      pushNotification({
+        type: 'expense',
+        title: `New Expense: ${newExpense.description}`,
+        body: `${resolvedPaidByName} added ${formatCurrency(newExpense.amount, groupCurrency)} in ${targetGroup?.name || 'group'}`,
+        groupId: newExpense.groupId,
+        expenseId: newId,
+        actorEmail: newExpense.paidByEmail,
+        actorName: resolvedPaidByName,
+      });
+
       const client = getSupabaseClient();
       if (client && isOnline) {
         try {
@@ -1348,7 +1647,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             currency_code: newExpense.currencyCode,
             exchange_rate_to_group: newExpense.exchangeRateToGroup,
             category: newExpense.category,
-            paid_by_name: newExpense.paidByName,
+            paid_by_email: newExpense.paidByEmail,
             split_method: newExpense.splitMethod,
             date: newExpense.date,
             has_receipt: newExpense.hasReceipt,
@@ -1359,7 +1658,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             const splitsToInsert = newExpense.splits.map((s) => ({
               id: s.id,
               expense_id: newExpense.id,
-              member_name: s.memberName,
+              member_email: s.memberEmail,
               share_amount: s.shareAmount,
               percentage: s.percentage || null,
               shares: s.shares || null,
@@ -1369,7 +1668,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             return;
           }
         } catch {
-          // fall through to offline queue
         }
       }
 
@@ -1464,6 +1762,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           ? currentUserName
           : expenseData.paidByName;
 
+      const paidMember = targetGroup?.members.find(
+        (m) => m.name === resolvedPaidByName || m.email === resolvedPaidByName
+      );
+      const resolvedPaidByEmail = (
+        paidMember?.email ||
+        (resolvedPaidByName.includes('@') ? resolvedPaidByName : userProfile.email) ||
+        existing.paidByEmail ||
+        ''
+      ).trim().toLowerCase();
+
       const updatedExpense: Expense = {
         ...existing,
         description: expenseData.description,
@@ -1471,26 +1779,50 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         currencyCode: groupCurrency,
         exchangeRateToGroup: 1.0,
         category: expenseData.category,
+        paidByEmail: resolvedPaidByEmail,
         paidByName: resolvedPaidByName,
         splitMethod: expenseData.splitMethod,
         hasReceipt: expenseData.hasReceipt,
-        splits: expenseData.splits.map((split, index) => ({
-          id: `split-${id}-${index}`,
-          expenseId: id,
-          memberName:
+        splits: expenseData.splits.map((split, index) => {
+          const splitName =
             !split.memberName || split.memberName === 'You'
               ? currentUserName
-              : split.memberName,
-          shareAmount: Number(split.shareAmount),
-          percentage: split.percentage,
-          shares: split.shares,
-        })),
+              : split.memberName;
+          const memberObj = targetGroup?.members.find(
+            (m) => m.name === splitName || m.email === splitName
+          );
+          const memberEmail = (
+            memberObj?.email ||
+            (splitName.includes('@') ? splitName : userProfile.email) ||
+            ''
+          ).trim().toLowerCase();
+
+          return {
+            id: `split-${id}-${index}`,
+            expenseId: id,
+            memberEmail,
+            memberName: splitName,
+            shareAmount: Number(split.shareAmount),
+            percentage: split.percentage,
+            shares: split.shares,
+          };
+        }),
       };
 
       const updatedExpenses = allExpenses.map((exp) => (exp.id === id ? updatedExpense : exp));
       setAllExpenses(updatedExpenses);
       saveToLocalStorage(updatedExpenses, allSettlements, groups, activities);
       broadcastLocalEvent('expense_updated', updatedExpense);
+
+      pushNotification({
+        type: 'expense',
+        title: `Expense Updated`,
+        body: `${resolvedPaidByName} updated "${updatedExpense.description}" (${formatCurrency(updatedExpense.amount, groupCurrency)})`,
+        groupId: updatedExpense.groupId,
+        expenseId: id,
+        actorEmail: updatedExpense.paidByEmail,
+        actorName: resolvedPaidByName,
+      });
 
       const client = getSupabaseClient();
       if (client && isOnline) {
@@ -1501,7 +1833,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               description: updatedExpense.description,
               amount: updatedExpense.amount,
               category: updatedExpense.category,
-              paid_by_name: updatedExpense.paidByName,
+              paid_by_email: updatedExpense.paidByEmail,
               split_method: updatedExpense.splitMethod,
               has_receipt: updatedExpense.hasReceipt,
             })
@@ -1513,7 +1845,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               const splitsPayload = updatedExpense.splits.map((s) => ({
                 id: s.id,
                 expense_id: id,
-                member_name: s.memberName,
+                member_email: s.memberEmail,
                 share_amount: s.shareAmount,
                 percentage: s.percentage || null,
                 shares: s.shares || null,
@@ -1541,9 +1873,11 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       allSettlements,
       groups,
       activities,
+      userProfile,
       isOnline,
       saveToLocalStorage,
       broadcastLocalEvent,
+      pushNotification,
       refreshPendingCount,
       showToast,
     ]
@@ -1570,10 +1904,30 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           ? currentUserName
           : settlementData.recipientName;
 
+      const targetGroup = groups.find((g) => g.id === settlementData.groupId);
+      const payerMember = targetGroup?.members.find(
+        (m) => m.name === resolvedPayerName || m.email === resolvedPayerName
+      );
+      const recipientMember = targetGroup?.members.find(
+        (m) => m.name === resolvedRecipientName || m.email === resolvedRecipientName
+      );
+      const payerEmail = (
+        payerMember?.email ||
+        (resolvedPayerName.includes('@') ? resolvedPayerName : userProfile.email) ||
+        ''
+      ).trim().toLowerCase();
+      const recipientEmail = (
+        recipientMember?.email ||
+        (resolvedRecipientName.includes('@') ? resolvedRecipientName : '') ||
+        ''
+      ).trim().toLowerCase();
+
       const newSettlement: Settlement = {
         id: newId,
         groupId: settlementData.groupId,
+        payerEmail,
         payerName: resolvedPayerName,
+        recipientEmail,
         recipientName: resolvedRecipientName,
         amount: Number(settlementData.amount),
         currencyCode: 'USD',
@@ -1600,14 +1954,23 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       saveToLocalStorage(allExpenses, updatedSettlements, groups, updatedActivities);
       broadcastLocalEvent('settlement_added', newSettlement);
 
+      pushNotification({
+        type: 'settlement',
+        title: `Payment Recorded`,
+        body: `${resolvedPayerName} paid ${resolvedRecipientName} $${Number(settlementData.amount).toFixed(2)} via ${settlementData.method}`,
+        groupId: settlementData.groupId,
+        actorEmail: payerEmail,
+        actorName: resolvedPayerName,
+      });
+
       const client = getSupabaseClient();
       if (client && isOnline) {
         try {
           await client.from('settlements').upsert({
             id: newSettlement.id,
             group_id: newSettlement.groupId,
-            payer_name: newSettlement.payerName,
-            recipient_name: newSettlement.recipientName,
+            payer_email: newSettlement.payerEmail,
+            recipient_email: newSettlement.recipientEmail,
             amount: newSettlement.amount,
             currency_code: newSettlement.currencyCode,
             method: newSettlement.method,
@@ -1617,7 +1980,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           showToast(`Payment of $${Number(settlementData.amount).toFixed(2)} synced`);
           return;
         } catch {
-          // fallback
         }
       }
 
@@ -1635,9 +1997,11 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       allSettlements,
       groups,
       activities,
+      userProfile,
       isOnline,
       saveToLocalStorage,
       broadcastLocalEvent,
+      pushNotification,
       refreshPendingCount,
       showToast,
     ]
@@ -1646,11 +2010,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   const addComment = useCallback(
     async (expenseId: string, content: string, authorName?: string) => {
       const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const currentUserEmail = (userProfile.email || '').trim().toLowerCase();
       const resolvedAuthor =
         !authorName || authorName === 'You' ? currentUserName : authorName;
       const newComment = {
         id: `comm-${Date.now()}`,
         expenseId,
+        authorEmail: currentUserEmail,
         authorName: resolvedAuthor,
         content,
         createdAt: new Date().toISOString(),
@@ -1664,20 +2030,28 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       saveToLocalStorage(updatedExpenses, allSettlements, groups, activities);
       broadcastLocalEvent('comment_added', { expenseId, comment: newComment });
 
+      pushNotification({
+        type: 'comment',
+        title: `New Note on Expense`,
+        body: `${resolvedAuthor}: "${content.slice(0, 80)}"`,
+        expenseId,
+        actorEmail: currentUserEmail,
+        actorName: resolvedAuthor,
+      });
+
       const client = getSupabaseClient();
       if (client && isOnline) {
         try {
           await client.from('comments').upsert({
             id: newComment.id,
             expense_id: expenseId,
-            author_name: authorName,
+            author_email: newComment.authorEmail,
             content,
             created_at: newComment.createdAt,
           });
           showToast('Note synced to database');
           return;
         } catch {
-          // fallback
         }
       }
 
@@ -1695,9 +2069,11 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       allSettlements,
       groups,
       activities,
+      userProfile,
       isOnline,
       saveToLocalStorage,
       broadcastLocalEvent,
+      pushNotification,
       refreshPendingCount,
       showToast,
     ]
@@ -1722,11 +2098,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         createdAt: nowIso,
         members: memberList.map((mName, index) => {
           const isSelf = mName === currentUserName;
+          const memberEmail = isSelf
+            ? (userProfile.email || '').trim().toLowerCase()
+            : mName.includes('@')
+            ? mName.trim().toLowerCase()
+            : `${mName.toLowerCase().replace(/[^a-z0-9]/g, '')}@invited.local`;
           return {
             id: `member-${newGroupId}-${index}`,
             groupId: newGroupId,
             name: mName,
-            email: isSelf ? userProfile.email : '',
+            email: memberEmail,
             avatarUrl: isSelf ? userProfile.avatarUrl || '' : '',
             role: isSelf ? 'owner' : 'editor',
             isCurrentUser: isSelf,
@@ -1752,16 +2133,14 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             default_currency: newGroup.defaultCurrency,
             simplify_debts: newGroup.simplifyDebts,
             user_role: newGroup.userRole,
-            created_by: userProfile.id || null,
+            created_by: userProfile.email || null,
             created_at: newGroup.createdAt,
           });
 
           const membersToInsert = newGroup.members.map((m) => ({
             id: m.id,
             group_id: newGroup.id,
-            name: m.name,
-            email: m.email || '',
-            avatar_url: m.avatarUrl || '',
+            email: m.email,
             role: m.role,
             is_current_user: false,
           }));
@@ -1825,9 +2204,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           .eq('group_id', groupId);
 
         const alreadyMember = (existingMembers || []).some((m) => {
-          if (userProfile.id && m.user_id === userProfile.id) return true;
           if (currentUserEmail && m.email && m.email.trim().toLowerCase() === currentUserEmail) return true;
-          if (currentUserName && m.name.trim().toLowerCase() === currentUserName.trim().toLowerCase()) return true;
           return false;
         });
 
@@ -1836,9 +2213,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           await client.from('group_members').insert({
             id: newMemberId,
             group_id: groupId,
-            name: currentUserName,
-            email: userProfile.email || '',
-            avatar_url: userProfile.avatarUrl || '',
+            email: currentUserEmail,
             role: role || 'editor',
             is_current_user: false,
           });
@@ -1857,8 +2232,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           await client.from('chat_messages').insert({
             id: `chat-${Date.now()}`,
             group_id: groupId,
-            sender_name: 'System',
-            sender_avatar_url: '',
+            sender_email: currentUserEmail,
             sender_is_current_user: false,
             content: `${currentUserName} joined the group via invite`,
             created_at: new Date().toISOString(),
@@ -2178,28 +2552,29 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     showToast('Google account disconnected');
   }, [updateUserProfile, showToast]);
 
+
+
   const sendTestNotification = useCallback(async () => {
+    let permissionGranted = false;
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
-      if (Notification.permission === 'granted') {
-        try {
-          new Notification('Splitest Notification', {
-            body: `${activeGroup.name || 'Splitest'}: Activity recorded in ledger`,
-            icon: '/Splitest.svg',
-          });
-          showToast('Notification sent');
-          return true;
-        } catch {
-          // fallback
-        }
+        const permission = await Notification.requestPermission();
+        permissionGranted = permission === 'granted';
+      } else {
+        permissionGranted = Notification.permission === 'granted';
       }
     }
 
-    showToast(`Test notification sent`);
+    pushNotification({
+      type: 'system',
+      title: 'Splitest Real-Time Alert',
+      body: `${activeGroup.name || 'Splitest'}: Real-time ledger updates and notification chimes are active.`,
+      groupId: activeGroup.id,
+    });
+
+    showToast(permissionGranted ? 'Test push and chime triggered' : 'In-app notification and chime triggered');
     return true;
-  }, [activeGroup.name, showToast]);
+  }, [activeGroup, pushNotification, showToast]);
 
   const sendChatMessage = useCallback(
     async (data: {
@@ -2211,11 +2586,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     }) => {
       const nowIso = new Date().toISOString();
       const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const currentUserEmail = (userProfile.email || '').trim().toLowerCase();
       const senderName = data.senderName || currentUserName;
       const isSystem = senderName === 'System';
       const newMessage: GroupChatMessage = {
         id: `chat-${Date.now()}`,
         groupId: data.groupId,
+        senderEmail: isSystem ? 'system@splitest.local' : currentUserEmail,
         senderName,
         senderAvatarUrl: isSystem ? '' : userProfile.avatarUrl,
         senderIsCurrentUser: isSystem ? false : true,
@@ -2239,14 +2616,24 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
       broadcastLocalEvent('chat_message_added', newMessage);
 
+      if (!isSystem) {
+        pushNotification({
+          type: 'chat',
+          title: `New message from ${senderName}`,
+          body: data.content.length > 80 ? `${data.content.slice(0, 80)}...` : data.content,
+          groupId: data.groupId,
+          actorEmail: currentUserEmail,
+          actorName: senderName,
+        });
+      }
+
       const client = getSupabaseClient();
       if (client && isOnline) {
         try {
           await client.from('chat_messages').upsert({
             id: newMessage.id,
             group_id: newMessage.groupId,
-            sender_name: newMessage.senderName,
-            sender_avatar_url: newMessage.senderAvatarUrl,
+            sender_email: newMessage.senderEmail,
             sender_is_current_user: false,
             content: newMessage.content,
             mentions: newMessage.mentions,
@@ -2267,7 +2654,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       });
       await refreshPendingCount();
     },
-    [userProfile, isOnline, broadcastLocalEvent, refreshPendingCount]
+    [userProfile, isOnline, broadcastLocalEvent, refreshPendingCount, pushNotification]
   );
 
   const createGroupFromChat = useCallback(
@@ -2275,6 +2662,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const newGroupId = `group-${Date.now()}`;
       const nowIso = new Date().toISOString();
       const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const currentUserEmail = (userProfile.email || '').trim().toLowerCase();
       const memberList = Array.from(new Set([currentUserName, ...memberNames.filter(Boolean)]));
       const newGroup: Group = {
         id: newGroupId,
@@ -2288,11 +2676,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         createdAt: nowIso,
         members: memberList.map((mName, index) => {
           const isSelf = mName === currentUserName;
+          const memberEmail = isSelf
+            ? currentUserEmail
+            : mName.includes('@')
+            ? mName.trim().toLowerCase()
+            : `${mName.toLowerCase().replace(/[^a-z0-9]/g, '')}@invited.local`;
           return {
             id: `member-${newGroupId}-${index}`,
             groupId: newGroupId,
             name: mName,
-            email: isSelf ? userProfile.email : '',
+            email: memberEmail,
             avatarUrl: isSelf ? userProfile.avatarUrl || '' : '',
             role: isSelf ? 'owner' : 'editor',
             isCurrentUser: isSelf,
@@ -2323,15 +2716,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           default_currency: newGroup.defaultCurrency,
           simplify_debts: newGroup.simplifyDebts,
           user_role: newGroup.userRole,
-          created_by: userProfile.id || null,
+          created_by: currentUserEmail || null,
           created_at: newGroup.createdAt,
         }).then(() => {
           const membersToInsert = newGroup.members.map((m) => ({
             id: m.id,
             group_id: newGroup.id,
-            name: m.name,
-            email: m.email || '',
-            avatar_url: m.avatarUrl || '',
+            email: m.email,
             role: m.role,
             is_current_user: false,
           }));
@@ -2381,6 +2772,11 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const newDmId = `dm-${Date.now()}`;
       const nowIso = new Date().toISOString();
       const friendDisplayName = friend.name || friend.username || 'Friend';
+      const friendEmail = (
+        friend.email ||
+        (friend.username ? `${friend.username}@invited.local` : '') ||
+        `${friendDisplayName.toLowerCase().replace(/[^a-z0-9]/g, '')}@invited.local`
+      ).trim().toLowerCase();
       const newDmGroup: Group = {
         id: newDmId,
         name: friendDisplayName,
@@ -2406,7 +2802,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             id: `member-${newDmId}-1`,
             groupId: newDmId,
             name: friendDisplayName,
-            email: friend.email || '',
+            email: friendEmail,
             avatarUrl: friend.avatarUrl || '',
             role: 'editor',
             isCurrentUser: false,
@@ -2437,15 +2833,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           default_currency: newDmGroup.defaultCurrency,
           simplify_debts: newDmGroup.simplifyDebts,
           user_role: newDmGroup.userRole,
-          created_by: userProfile.id || null,
+          created_by: currentUserEmail || null,
           created_at: newDmGroup.createdAt,
         }).then(() => {
           const membersToInsert = newDmGroup.members.map((m) => ({
             id: m.id,
             group_id: newDmGroup.id,
-            name: m.name,
-            email: m.email || '',
-            avatar_url: m.avatarUrl || '',
+            email: m.email,
             role: m.role,
             is_current_user: false,
           }));
@@ -2474,15 +2868,22 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const toAdd = newMemberNames.filter((name) => !existingNames.has(name.toLowerCase()));
       if (toAdd.length === 0) return;
 
-      const newMembers: GroupMember[] = toAdd.map((name, index) => ({
-        id: `member-${groupId}-${Date.now()}-${index}`,
-        groupId,
-        name,
-        email: '',
-        avatarUrl: '',
-        role: 'editor',
-        isCurrentUser: false,
-      }));
+      const newMembers: GroupMember[] = toAdd.map((name, index) => {
+        const memberEmail = (
+          name.includes('@')
+            ? name
+            : `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}@invited.local`
+        ).trim().toLowerCase();
+        return {
+          id: `member-${groupId}-${Date.now()}-${index}`,
+          groupId,
+          name,
+          email: memberEmail,
+          avatarUrl: '',
+          role: 'editor',
+          isCurrentUser: false,
+        };
+      });
 
       const updatedGroups = groups.map((g) => {
         if (g.id === groupId) {
@@ -2510,9 +2911,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         const payload = newMembers.map((m) => ({
           id: m.id,
           group_id: m.groupId,
-          name: m.name,
           email: m.email,
-          avatar_url: m.avatarUrl,
           role: m.role,
           is_current_user: false,
         }));
@@ -2604,9 +3003,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           await client.from('group_members').insert({
             id: newMember.id,
             group_id: newMember.groupId,
-            name: newMember.name,
             email: newMember.email,
-            avatar_url: newMember.avatarUrl,
             role: newMember.role,
             is_current_user: false,
           });
@@ -2783,16 +3180,25 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   const addFriendDirectly = useCallback(
     async (friend: FriendContact) => {
       const friendUsername = friend.username || friend.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+      const currentUserEmail = (userProfile.email || '').trim().toLowerCase();
+      const friendEmail = (
+        friend.email ||
+        (friend.username ? `${friend.username}@invited.local` : '') ||
+        `${friendUsername}@invited.local`
+      ).trim().toLowerCase();
+
       const friendContact: FriendContact = {
         ...friend,
         username: friendUsername,
         name: friend.name || friendUsername,
         avatarUrl: friend.avatarUrl || '',
+        email: friendEmail,
       };
 
       setCustomFriends((prev) => {
         const exists = prev.some(
           (item) =>
+            (item.email && friendContact.email && item.email.toLowerCase() === friendContact.email.toLowerCase()) ||
             (item.username && friendContact.username && item.username.toLowerCase() === friendContact.username.toLowerCase()) ||
             item.name.toLowerCase() === friendContact.name.toLowerCase()
         );
@@ -2805,22 +3211,25 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         return updated;
       });
 
+      pushNotification({
+        type: 'invite',
+        title: 'New connection added',
+        body: `@${friendContact.username} was added to your friends list.`,
+        actorEmail: friendContact.email,
+        actorName: friendContact.name,
+      });
+
       const client = getSupabaseClient();
       if (client && isOnline) {
         try {
-          const authUser = (await client.auth.getUser()).data.user;
-          const currentUid = authUser?.id || userProfile?.id || 'user';
           const friendRecordId = friendContact.id?.startsWith('friend-')
             ? friendContact.id
-            : `friend-${currentUid}-${friendContact.username}`;
+            : `friend-${currentUserEmail}-${friendContact.email || friendContact.username}`;
 
           await client.from('friends').upsert({
             id: friendRecordId,
-            name: friendContact.name,
-            username: friendContact.username,
-            email: friendContact.email || '',
-            avatar_url: friendContact.avatarUrl || '',
-            phone: currentUid,
+            user_email: currentUserEmail,
+            email: friendContact.email,
             added_via: friendContact.addedVia || 'directory',
           });
           showToast(`Added @${friendContact.username} as friend`);
@@ -2838,7 +3247,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       await refreshPendingCount();
       showToast(`Added @${friendContact.username} locally`);
     },
-    [isOnline, refreshPendingCount, showToast, userProfile]
+    [isOnline, refreshPendingCount, showToast, userProfile, pushNotification]
   );
 
   const addFriendByUsername = useCallback(
@@ -2960,6 +3369,17 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       syncGoogleAccount,
       disconnectGoogleAccount,
       sendTestNotification,
+      notifications,
+      unreadNotificationsCount,
+      isNotificationCenterOpen,
+      setIsNotificationCenterOpen,
+      markNotificationAsRead,
+      markAllNotificationsAsRead,
+      clearNotifications,
+      deleteNotification,
+      pushNotification,
+      toggleLedgerNotifications,
+      mutedLedgerIds,
       chatMessages,
       allChatMessages,
       sendChatMessage,
@@ -3029,6 +3449,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       syncGoogleAccount,
       disconnectGoogleAccount,
       sendTestNotification,
+      notifications,
+      unreadNotificationsCount,
+      isNotificationCenterOpen,
+      markNotificationAsRead,
+      markAllNotificationsAsRead,
+      clearNotifications,
+      deleteNotification,
+      pushNotification,
+      toggleLedgerNotifications,
+      mutedLedgerIds,
       chatMessages,
       allChatMessages,
       sendChatMessage,

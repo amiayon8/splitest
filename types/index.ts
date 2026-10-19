@@ -1,9 +1,10 @@
 export interface FriendContact {
   id: string;
+  email: string;
   name: string;
   username: string;
-  email: string;
   avatarUrl: string;
+  phone?: string;
   netBalance?: number;
   groupCount?: number;
   addedVia?: 'link' | 'username' | 'group' | 'search' | 'directory';
@@ -12,8 +13,10 @@ export interface FriendContact {
 export interface GroupMember {
   id: string;
   groupId: string;
+  email: string;
   name: string;
-  email?: string;
+  username?: string;
+  phone?: string;
   avatarUrl: string;
   role: 'owner' | 'editor' | 'viewer';
   isCurrentUser: boolean;
@@ -37,6 +40,7 @@ export interface Group {
 export interface ExpenseSplit {
   id: string;
   expenseId: string;
+  memberEmail: string;
   memberName: string;
   shareAmount: number;
   percentage?: number;
@@ -46,6 +50,7 @@ export interface ExpenseSplit {
 export interface ExpenseComment {
   id: string;
   expenseId: string;
+  authorEmail: string;
   authorName: string;
   content: string;
   createdAt: string;
@@ -59,6 +64,7 @@ export interface Expense {
   currencyCode: string;
   exchangeRateToGroup: number;
   category: 'villa' | 'dining' | 'transport' | 'activities' | 'groceries' | 'general';
+  paidByEmail: string;
   paidByName: string;
   splitMethod: 'equal' | 'exact' | 'percentage' | 'shares';
   date: string;
@@ -71,6 +77,8 @@ export interface Expense {
 export interface Settlement {
   id: string;
   groupId: string;
+  payerEmail: string;
+  recipientEmail: string;
   payerName: string;
   recipientName: string;
   amount: number;
@@ -146,6 +154,7 @@ export interface ChatAttachment {
 export interface GroupChatMessage {
   id: string;
   groupId: string;
+  senderEmail: string;
   senderName: string;
   senderAvatarUrl: string;
   senderIsCurrentUser: boolean;
@@ -154,4 +163,17 @@ export interface GroupChatMessage {
   attachment?: ChatAttachment;
   likes?: string[];
   createdAt: string;
+}
+
+export interface InAppNotification {
+  id: string;
+  type: 'expense' | 'settlement' | 'comment' | 'chat' | 'invite' | 'system';
+  title: string;
+  body: string;
+  timestamp: string;
+  read: boolean;
+  groupId?: string;
+  expenseId?: string;
+  actorEmail?: string;
+  actorName?: string;
 }

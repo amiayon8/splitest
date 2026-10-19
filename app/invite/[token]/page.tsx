@@ -113,9 +113,10 @@ function InviteContent({ params }: InvitePageProps) {
           return;
         }
 
-        const [groupRes, membersRes] = await Promise.all([
+        const [groupRes, membersRes, profilesRes] = await Promise.all([
           client.from("groups").select("*").eq("id", matchedGroupId).maybeSingle(),
           client.from("group_members").select("*").eq("group_id", matchedGroupId),
+          client.from("profiles").select("id, email, full_name, username, avatar_url, phone"),
         ]);
 
         if (isCancelled) return;
@@ -125,6 +126,13 @@ function InviteContent({ params }: InvitePageProps) {
           setErrorMessage("Group no longer exists.");
           return;
         }
+
+        const profileMap = new Map<string, { full_name?: string; username?: string; avatar_url?: string; phone?: string }>();
+        (profilesRes.data || []).forEach((profileRecord) => {
+          if (profileRecord.email) {
+            profileMap.set(profileRecord.email.toLowerCase().trim(), profileRecord);
+          }
+        });
 
         const fetchedMembers = membersRes.data || [];
         const built: Group = {
@@ -137,15 +145,21 @@ function InviteContent({ params }: InvitePageProps) {
           simplifyDebts: groupRes.data.simplify_debts ?? true,
           userRole: matchedRole,
           createdAt: groupRes.data.created_at,
-          members: fetchedMembers.map((m) => ({
-            id: m.id,
-            groupId: m.group_id,
-            name: m.name,
-            email: m.email,
-            avatarUrl: m.avatar_url || "",
-            role: m.role || "editor",
-            isCurrentUser: false,
-          })),
+          members: fetchedMembers.map((m) => {
+            const cleanEmail = (m.email || "").toLowerCase().trim();
+            const prof = cleanEmail ? profileMap.get(cleanEmail) : undefined;
+            const name = prof?.full_name || prof?.username || (cleanEmail ? cleanEmail.split("@")[0] : "Member");
+            return {
+              id: m.id,
+              groupId: m.group_id,
+              name,
+              username: prof?.username || (cleanEmail ? cleanEmail.split("@")[0] : undefined),
+              email: m.email,
+              avatarUrl: prof?.avatar_url || (cleanEmail ? `https://www.gravatar.com/avatar/${cleanEmail}?s=160&d=mp` : ""),
+              role: m.role || "editor",
+              isCurrentUser: false,
+            };
+          }),
         };
 
         setTargetGroup(built);

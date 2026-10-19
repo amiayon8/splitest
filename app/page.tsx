@@ -21,6 +21,7 @@ import { CreateGroupModal } from "@/components/CreateGroupModal";
 import { LedgerSettingsModal } from "@/components/LedgerSettingsModal";
 import { ShareProfileModal } from "@/components/ShareProfileModal";
 import { AddFriendModal } from "@/components/AddFriendModal";
+import { NotificationCenterModal } from "@/components/NotificationCenterModal";
 import { MobileNavigation } from "@/components/MobileNavigation";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { Toast } from "@/components/Toast";
@@ -65,6 +66,7 @@ export default function HomePage() {
       />
       <ShareProfileModal />
       <AddFriendModal />
+      <NotificationCenterModal />
       <CreateGroupModal />
       <LedgerSettingsModal />
       <MobileNavigation />

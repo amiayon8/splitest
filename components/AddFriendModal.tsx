@@ -143,7 +143,7 @@ export function AddFriendModal() {
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Add Friends</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Search by username or paste a profile link</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Search by username, email, or paste a profile link</p>
             </div>
           </div>
           <button
@@ -169,7 +169,7 @@ export function AddFriendModal() {
                 setStatusMessage(null);
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Enter username or paste /u/ link..."
+              placeholder="Enter username, email, or paste /u/ link..."
               className="w-full pl-10 pr-24 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary text-slate-900 dark:text-white placeholder:text-slate-400"
               autoFocus
             />

@@ -32,6 +32,8 @@ export function Header() {
     sendTestNotification,
     theme,
     setTheme,
+    unreadNotificationsCount,
+    setIsNotificationCenterOpen,
   } = useSplitest();
 
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
@@ -179,7 +181,7 @@ export function Header() {
           <button
             type="button"
             onClick={toggleNextTheme}
-            className="w-9 h-9 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 hidden sm:flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 hidden sm:flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
             title={`Current theme: ${theme}. Click to switch.`}
             aria-label="Toggle theme appearance"
           >
@@ -189,6 +191,24 @@ export function Header() {
               <Sun className="w-4 h-4 text-amber-500" />
             ) : (
               <Monitor className="w-4 h-4 text-slate-500 dark:text-slate-300" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              navigator.vibrate?.(10);
+              setIsNotificationCenterOpen(true);
+            }}
+            className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-all active:scale-90"
+            aria-label="Open notifications"
+            title="Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-[#059669] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-[#0F172A] shadow-xs">
+                {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
+              </span>
             )}
           </button>
 

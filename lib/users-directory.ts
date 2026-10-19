@@ -179,6 +179,26 @@ export async function fetchUserProfileFromDatabase(
         return mapDatabaseProfile(byEmail, normalized);
       }
 
+      if (rawUsernameOrUrl.includes("@") && rawUsernameOrUrl.includes(".")) {
+        const cleanEmail = rawUsernameOrUrl.trim().toLowerCase();
+        const prefix = cleanEmail.split("@")[0] || "user";
+        const displayName = prefix
+          .split(/[._-]/)
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ");
+        const handle = prefix.toLowerCase().replace(/[^a-z0-9]/g, ".");
+        return {
+          id: `stub-${cleanEmail}`,
+          name: displayName,
+          username: handle,
+          email: cleanEmail,
+          avatarUrl: `https://www.gravatar.com/avatar/${handle}?s=160&d=mp`,
+          netBalance: 0,
+          groupCount: 0,
+          addedVia: "directory",
+        };
+      }
+
       return null;
     }
 
