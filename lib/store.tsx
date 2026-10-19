@@ -130,6 +130,7 @@ interface SplitestContextType {
   createGroup: (name: string, category: string, icon: string, memberNames: string[]) => Promise<void>;
   joinGroup: (groupId: string, role?: 'owner' | 'editor' | 'viewer') => Promise<{ success: boolean; message: string; group?: Group }>;
   updateGroup: (groupId: string, updates: Partial<Group>) => Promise<void>;
+  deleteGroup: (groupId: string) => Promise<{ success: boolean; message: string }>;
   updateSupabaseCredentials: (url: string, anonKey: string) => Promise<boolean>;
   clearSupabaseCredentials: () => void;
   sendPaymentReminders: () => void;
@@ -538,6 +539,11 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             const { error } = await client.from('groups').update(payload).eq('id', groupId);
             return !error;
           }
+          case 'delete_group': {
+            const { groupId } = mutation.payload as { groupId: string };
+            const { error } = await client.from('groups').delete().eq('id', groupId);
+            return !error;
+          }
           case 'send_chat_message': {
             const chat = mutation.payload as unknown as GroupChatMessage;
             const { error } = await client.from('chat_messages').upsert({
@@ -829,23 +835,35 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
       const builtGroups: Group[] = (groupsRes.data || [])
         .filter((item) => item.id !== 'group-bali-retreat')
-        .map((item) => ({
-          id: item.id,
-          name: item.name,
-          icon: item.icon || 'Users',
-          category: item.category || 'Trip',
-          description: item.description,
-          defaultCurrency: item.default_currency || 'USD',
-          simplifyDebts: item.simplify_debts ?? true,
-          userRole:
-            item.user_role === 'owner' || item.user_role === 'editor' || item.user_role === 'viewer'
-              ? item.user_role
-              : 'editor',
-          createdAt: item.created_at,
-          isDirectChat: Boolean(item.category === 'Direct' || item.id.startsWith('dm-')),
-          members: rawMembers
-            .filter((m) => m.group_id === item.id)
-            .map((m) => {
+        .map((item) => {
+          const groupSpecificMembers = rawMembers.filter((m) => m.group_id === item.id);
+          const isCreator = Boolean(item.created_by && effectiveProfile.id && item.created_by === effectiveProfile.id);
+          const hasOwnerRole = groupSpecificMembers.some((m) => {
+            const memberEmail = (m.email || '').trim().toLowerCase();
+            const memberName = (m.name || '').trim().toLowerCase();
+            const isMatch = (userEmail && memberEmail && memberEmail === userEmail) ||
+              (userFullName && memberName && memberName === userFullName) ||
+              (userHandle && memberName && memberName === userHandle);
+            return isMatch && m.role === 'owner';
+          });
+          const resolvedUserRole = (item.user_role === 'owner' || isCreator || hasOwnerRole)
+            ? 'owner'
+            : item.user_role === 'editor' || item.user_role === 'viewer'
+            ? item.user_role
+            : 'editor';
+
+          return {
+            id: item.id,
+            name: item.name,
+            icon: item.icon || 'Users',
+            category: item.category || 'Trip',
+            description: item.description,
+            defaultCurrency: item.default_currency || 'USD',
+            simplifyDebts: item.simplify_debts ?? true,
+            userRole: resolvedUserRole,
+            createdAt: item.created_at,
+            isDirectChat: Boolean(item.category === 'Direct' || item.id.startsWith('dm-')),
+            members: groupSpecificMembers.map((m) => {
               const memberEmail = (m.email || '').trim().toLowerCase();
               const memberName = (m.name || '').trim().toLowerCase();
 
@@ -876,7 +894,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
                 isCurrentUser: isCurrent,
               };
             }),
-        }));
+          };
+        });
 
       const fetchedSplits = splitsRes.data || [];
       const fetchedComments = commentsRes.data || [];
@@ -1108,6 +1127,12 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           );
         } else if (type === 'group_created') {
           setGroups((prev) => [payload as Group, ...prev]);
+        } else if (type === 'group_deleted') {
+          const deletedId = payload as string;
+          setGroups((prev) => prev.filter((g) => g.id !== deletedId));
+          setAllExpenses((prev) => prev.filter((e) => e.groupId !== deletedId));
+          setAllSettlements((prev) => prev.filter((s) => s.groupId !== deletedId));
+          setAllChatMessages((prev) => prev.filter((c) => c.groupId !== deletedId));
         } else if (type === 'chat_message_added') {
           setAllChatMessages((prev) => [...prev, payload as GroupChatMessage]);
         }
@@ -1858,6 +1883,84 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       allExpenses,
       allSettlements,
       activities,
+      isOnline,
+      saveToLocalStorage,
+      broadcastLocalEvent,
+      refreshPendingCount,
+      showToast,
+    ]
+  );
+
+  const deleteGroup = useCallback(
+    async (groupId: string): Promise<{ success: boolean; message: string }> => {
+      const target = groups.find((g) => g.id === groupId);
+      if (!target) {
+        return { success: false, message: 'Group not found.' };
+      }
+
+      const isCurrentOwner =
+        target.userRole === 'owner' ||
+        target.members.some((m) => m.isCurrentUser && m.role === 'owner');
+
+      if (!isCurrentOwner) {
+        showToast('Only the group owner can delete this group.');
+        return { success: false, message: 'Only the group owner can delete this group.' };
+      }
+
+      const nextGroups = groups.filter((g) => g.id !== groupId);
+      const nextExpenses = allExpenses.filter((e) => e.groupId !== groupId);
+      const nextSettlements = allSettlements.filter((s) => s.groupId !== groupId);
+      const nextChat = allChatMessages.filter((c) => c.groupId !== groupId);
+
+      setGroups(nextGroups);
+      setAllExpenses(nextExpenses);
+      setAllSettlements(nextSettlements);
+      setAllChatMessages(nextChat);
+
+      if (activeGroupId === groupId) {
+        const remainingExpenseGroups = nextGroups.filter(
+          (g) => !g.isDirectChat && g.category !== 'Direct' && !g.id.startsWith('dm-')
+        );
+        const fallbackId = remainingExpenseGroups[0]?.id || nextGroups[0]?.id || '';
+        setActiveGroupId(fallbackId);
+      }
+
+      saveToLocalStorage(nextExpenses, nextSettlements, nextGroups, activities, nextChat);
+      void deleteCachedItem('groups', groupId);
+      broadcastLocalEvent('group_deleted', groupId);
+
+      const client = getSupabaseClient();
+      if (client && isOnline) {
+        try {
+          const { error } = await client.from('groups').delete().eq('id', groupId);
+          if (error) {
+            showToast('Failed to delete group from database.');
+            return { success: false, message: error.message };
+          }
+          showToast(`Deleted group "${target.name}"`);
+          return { success: true, message: `Deleted group "${target.name}"` };
+        } catch {
+          showToast('Network error while deleting group.');
+        }
+      }
+
+      await queueMutation({
+        id: `mut-${Date.now()}`,
+        type: 'delete_group',
+        payload: { groupId },
+        timestamp: new Date().toISOString(),
+      });
+      await refreshPendingCount();
+      showToast(`Deleted group "${target.name}" locally`);
+      return { success: true, message: `Deleted group "${target.name}" locally` };
+    },
+    [
+      groups,
+      allExpenses,
+      allSettlements,
+      allChatMessages,
+      activities,
+      activeGroupId,
       isOnline,
       saveToLocalStorage,
       broadcastLocalEvent,
@@ -2804,6 +2907,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       createGroup,
       joinGroup,
       updateGroup,
+      deleteGroup,
       updateSupabaseCredentials,
       clearSupabaseCredentials,
       sendPaymentReminders,
@@ -2872,6 +2976,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       createGroup,
       joinGroup,
       updateGroup,
+      deleteGroup,
       updateSupabaseCredentials,
       clearSupabaseCredentials,
       sendPaymentReminders,

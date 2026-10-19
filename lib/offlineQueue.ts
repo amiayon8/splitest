@@ -14,6 +14,7 @@ export interface QueuedMutation {
     | 'record_settlement'
     | 'create_group'
     | 'update_group'
+    | 'delete_group'
     | 'send_chat_message'
     | 'toggle_chat_like'
     | 'add_comment'
