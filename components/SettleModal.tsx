@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSplitest } from '@/lib/store';
+import { getCurrentUserMemberName } from '@/lib/split-calculator';
 import { X, Handshake, Check } from 'lucide-react';
 
 export function SettleModal() {
   const {
     activeGroup,
+    userProfile,
     isSettleModalOpen,
     setIsSettleModalOpen,
     settlePrefill,
@@ -15,13 +17,20 @@ export function SettleModal() {
     activeCurrency,
   } = useSplitest();
 
+  const currentUserName = useMemo(
+    () => getCurrentUserMemberName(activeGroup, userProfile),
+    [activeGroup, userProfile]
+  );
+
   const [recipient, setRecipient] = useState(() => {
     if (settlePrefill?.recipient) return settlePrefill.recipient;
-    const otherMembers = activeGroup.members.filter((m) => m.name !== 'You');
+    const otherMembers = activeGroup.members.filter(
+      (m) => m.name !== currentUserName && m.name !== 'You'
+    );
     return otherMembers[0]?.name || '';
   });
 
-  const [payer, setPayer] = useState('You');
+  const [payer, setPayer] = useState(currentUserName);
   const [amountInput, setAmountInput] = useState(() => {
     if (settlePrefill?.amount) return settlePrefill.amount.toFixed(2);
     return '50.00';
@@ -85,11 +94,14 @@ export function SettleModal() {
                 aria-label="Select payer"
                 className="w-full h-11 px-3 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981]"
               >
-                {activeGroup.members.map((m) => (
-                  <option key={m.id} value={m.name} className="dark:bg-[#1E293B] dark:text-slate-200">
-                    {m.name}
-                  </option>
-                ))}
+                {activeGroup.members.map((m) => {
+                  const isSelf = m.name === currentUserName || m.name === 'You' || m.isCurrentUser;
+                  return (
+                    <option key={m.id} value={m.name} className="dark:bg-[#1E293B] dark:text-slate-200">
+                      {m.name}{isSelf && m.name !== 'You' ? ' (You)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -103,11 +115,14 @@ export function SettleModal() {
               >
                 {activeGroup.members
                   .filter((m) => m.name !== payer)
-                  .map((m) => (
-                    <option key={m.id} value={m.name} className="dark:bg-[#1E293B] dark:text-slate-200">
-                      {m.name}
-                    </option>
-                  ))}
+                  .map((m) => {
+                    const isSelf = m.name === currentUserName || m.name === 'You' || m.isCurrentUser;
+                    return (
+                      <option key={m.id} value={m.name} className="dark:bg-[#1E293B] dark:text-slate-200">
+                        {m.name}{isSelf && m.name !== 'You' ? ' (You)' : ''}
+                      </option>
+                    );
+                  })}
               </select>
             </div>
           </div>

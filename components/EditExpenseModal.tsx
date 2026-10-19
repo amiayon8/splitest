@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSplitest } from '@/lib/store';
 import { Expense } from '@/types';
 import { getCurrencyInfo } from '@/lib/currency';
+import { getCurrentUserMemberName } from '@/lib/split-calculator';
 import {
   X,
   Check,
@@ -35,13 +36,19 @@ export function EditExpenseModal() {
     setEditingExpense,
     updateExpense,
     activeGroup,
+    userProfile,
     showToast,
   } = useSplitest();
+
+  const currentUserName = useMemo(
+    () => getCurrentUserMemberName(activeGroup, userProfile),
+    [activeGroup, userProfile]
+  );
 
   const [description, setDescription] = useState('');
   const [amountInput, setAmountInput] = useState('');
   const [category, setCategory] = useState<Expense['category']>('dining');
-  const [paidBy, setPaidBy] = useState('You');
+  const [paidBy, setPaidBy] = useState(currentUserName);
   const [splitMethod, setSplitMethod] = useState<Expense['splitMethod']>('equal');
   const [hasReceipt, setHasReceipt] = useState(false);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
@@ -52,10 +59,15 @@ export function EditExpenseModal() {
   useEffect(() => {
     if (!editingExpense) return;
 
+    const resolvedPayer =
+      !editingExpense.paidByName || editingExpense.paidByName === 'You'
+        ? currentUserName
+        : editingExpense.paidByName;
+
     setDescription(editingExpense.description || '');
     setAmountInput(editingExpense.amount ? editingExpense.amount.toString() : '');
     setCategory(editingExpense.category || 'general');
-    setPaidBy(editingExpense.paidByName || 'You');
+    setPaidBy(resolvedPayer);
     setSplitMethod(editingExpense.splitMethod || 'equal');
     setHasReceipt(!!editingExpense.hasReceipt);
 
@@ -292,11 +304,14 @@ export function EditExpenseModal() {
                 aria-label="Select who paid for the expense"
                 className="w-full h-11 px-3 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981]"
               >
-                {activeGroup.members.map((m) => (
-                  <option key={m.id} value={m.name} className="dark:bg-[#1E293B] dark:text-slate-200">
-                    {m.name === 'You' ? 'You' : m.name}
-                  </option>
-                ))}
+                {activeGroup.members.map((m) => {
+                  const isSelf = m.name === currentUserName || m.name === 'You' || m.isCurrentUser;
+                  return (
+                    <option key={m.id} value={m.name} className="dark:bg-[#1E293B] dark:text-slate-200">
+                      {m.name}{isSelf && m.name !== 'You' ? ' (You)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

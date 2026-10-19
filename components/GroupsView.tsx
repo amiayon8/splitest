@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useSplitest } from '@/lib/store';
 import { formatCurrency } from '@/lib/currency';
-import { calculateMemberBalances } from '@/lib/split-calculator';
+import { calculateMemberBalances, getCurrentUserBalance, getCurrentUserMemberName } from '@/lib/split-calculator';
 import { WalletCardDeck } from '@/components/WalletCardDeck';
 import { buildProfileShareUrl } from '@/lib/users-directory';
 import {
@@ -51,10 +51,10 @@ export function GroupsView() {
       const gSettlements = allSettlements.filter((item) => item.groupId === group.id);
       const memberNames = group.members.map((m) => m.name);
       const balances = calculateMemberBalances(memberNames, gExpenses, gSettlements);
-      map[group.id] = balances['You']?.netBalance || 0;
+      map[group.id] = getCurrentUserBalance(balances, group, userProfile)?.netBalance || 0;
     }
     return map;
-  }, [groups, allExpenses, allSettlements]);
+  }, [groups, allExpenses, allSettlements, userProfile]);
 
   const friendsList = useMemo(() => {
     const friendsMap = new Map<
@@ -67,9 +67,16 @@ export function GroupsView() {
       const gSettlements = allSettlements.filter((item) => item.groupId === group.id);
       const memberNames = group.members.map((m) => m.name);
       const balances = calculateMemberBalances(memberNames, gExpenses, gSettlements);
+      const currentMemberName = getCurrentUserMemberName(group, userProfile);
 
       for (const member of group.members) {
-        if (member.name === 'You') continue;
+        if (
+          member.name === currentMemberName ||
+          member.name === 'You' ||
+          (member.userId && member.userId === userProfile.id)
+        ) {
+          continue;
+        }
         const generatedUsername = member.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
         const current = friendsMap.get(member.name.toLowerCase()) || {
           name: member.name,

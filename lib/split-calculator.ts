@@ -1,4 +1,4 @@
-import { Expense, Settlement, SimplifiedDebt, MemberBalanceSummary, CategoryBreakdownItem } from '@/types';
+import { Expense, Settlement, SimplifiedDebt, MemberBalanceSummary, CategoryBreakdownItem, Group, UserProfile } from '@/types';
 
 export function calculateMemberBalances(
   members: string[],
@@ -224,3 +224,37 @@ export function formatCurrency(amount: number): string {
 export function formatAbsoluteCurrency(amount: number): string {
   return `$${Math.abs(amount).toFixed(2)}`;
 }
+
+export function getCurrentUserMemberName(
+  group?: Group | null,
+  userProfile?: UserProfile | null
+): string {
+  if (!group || !group.members || group.members.length === 0) {
+    return userProfile?.fullName || userProfile?.username || 'You';
+  }
+  const email = (userProfile?.email || '').trim().toLowerCase();
+  const name = (userProfile?.fullName || '').trim().toLowerCase();
+  const handle = (userProfile?.username || '').trim().toLowerCase();
+
+  const found = group.members.find((m) => {
+    if (m.isCurrentUser) return true;
+    if (email && m.email && m.email.trim().toLowerCase() === email) return true;
+    const mName = m.name.trim().toLowerCase();
+    if (name && mName === name) return true;
+    if (handle && mName === handle) return true;
+    if (mName === 'you') return true;
+    return false;
+  });
+
+  return found?.name || userProfile?.fullName || userProfile?.username || 'You';
+}
+
+export function getCurrentUserBalance(
+  balances: Record<string, MemberBalanceSummary>,
+  group?: Group | null,
+  userProfile?: UserProfile | null
+): MemberBalanceSummary | undefined {
+  const currentName = getCurrentUserMemberName(group, userProfile);
+  return balances[currentName] || balances['You'];
+}
+

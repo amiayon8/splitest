@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSplitest } from '@/lib/store';
 import { Expense } from '@/types';
 import { getCurrencyInfo } from '@/lib/currency';
 import { serializeToUtc } from '@/lib/timezone';
+import { getCurrentUserMemberName } from '@/lib/split-calculator';
 import {
   X,
   Check,
@@ -18,16 +19,28 @@ import {
 export function AddExpenseModal() {
   const {
     activeGroup,
+    userProfile,
     isAddExpenseModalOpen,
     setIsAddExpenseModalOpen,
     addExpense,
     showToast,
   } = useSplitest();
 
+  const currentUserName = useMemo(
+    () => getCurrentUserMemberName(activeGroup, userProfile),
+    [activeGroup, userProfile]
+  );
+
   const [description, setDescription] = useState('');
   const [amountInput, setAmountInput] = useState('');
   const [category, setCategory] = useState<Expense['category']>('dining');
-  const [paidBy, setPaidBy] = useState('You');
+  const [paidBy, setPaidBy] = useState(currentUserName);
+
+  useEffect(() => {
+    if (isAddExpenseModalOpen) {
+      setPaidBy(currentUserName);
+    }
+  }, [isAddExpenseModalOpen, currentUserName]);
   const [splitMethod, setSplitMethod] = useState<Expense['splitMethod']>('equal');
   const [hasReceipt, setHasReceipt] = useState(false);
   const [selectedMembers, setSelectedMembers] = useState<string[]>(() =>
@@ -248,11 +261,14 @@ export function AddExpenseModal() {
                 aria-label="Select who paid for the expense"
                 className="w-full h-11 px-3 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#059669] dark:focus:border-[#10B981]"
               >
-                {activeGroup.members.map((m) => (
-                  <option key={m.id} value={m.name} className="dark:bg-[#1E293B] dark:text-slate-200">
-                    {m.name === 'You' ? 'You' : m.name}
-                  </option>
-                ))}
+                {activeGroup.members.map((m) => {
+                  const isSelf = m.name === currentUserName || m.name === 'You' || m.isCurrentUser;
+                  return (
+                    <option key={m.id} value={m.name} className="dark:bg-[#1E293B] dark:text-slate-200">
+                      {m.name}{isSelf && m.name !== 'You' ? ' (You)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

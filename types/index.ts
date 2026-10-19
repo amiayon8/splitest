@@ -17,6 +17,7 @@ export interface GroupMember {
   avatarUrl: string;
   role: 'owner' | 'editor' | 'viewer';
   isCurrentUser: boolean;
+  userId?: string;
 }
 
 export interface Group {

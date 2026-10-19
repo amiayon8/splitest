@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSplitest } from "@/lib/store";
+import { getSupabaseClient } from "@/lib/supabase";
 import {
   X,
   Copy,
@@ -20,7 +21,7 @@ interface ShareGroupModalProps {
 }
 
 export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
-  const { activeGroup, showToast } = useSplitest();
+  const { activeGroup, userProfile, showToast } = useSplitest();
 
   const [emailInput, setEmailInput] = useState("");
   const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
@@ -33,6 +34,19 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
 
   const linkToken = customToken || `invite-${activeGroup.id}-access`;
 
+  useEffect(() => {
+    if (!isOpen || !activeGroup?.id) return;
+    const client = getSupabaseClient();
+    if (client) {
+      void client.from("group_invites").upsert({
+        id: linkToken,
+        group_id: activeGroup.id,
+        role: generalAccessRole,
+        created_by: userProfile.id || null,
+      });
+    }
+  }, [isOpen, activeGroup?.id, linkToken, generalAccessRole, userProfile.id]);
+
   if (!isOpen) return null;
 
   const inviteUrl =
@@ -40,16 +54,34 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
       ? `${window.location.origin}/invite/${linkToken}?role=${generalAccessRole}`
       : `https://splitest.thenicedev.xyz/invite/${linkToken}`;
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
+    const client = getSupabaseClient();
+    if (client && activeGroup?.id) {
+      await client.from("group_invites").upsert({
+        id: linkToken,
+        group_id: activeGroup.id,
+        role: generalAccessRole,
+        created_by: userProfile.id || null,
+      });
+    }
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     showToast("Invite link copied to clipboard");
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const handleResetLink = () => {
+  const handleResetLink = async () => {
     const newToken = `invite-${activeGroup.id}-${Date.now().toString(36)}`;
     setCustomToken(newToken);
+    const client = getSupabaseClient();
+    if (client && activeGroup?.id) {
+      await client.from("group_invites").upsert({
+        id: newToken,
+        group_id: activeGroup.id,
+        role: generalAccessRole,
+        created_by: userProfile.id || null,
+      });
+    }
     showToast("New invite link generated");
   };
 

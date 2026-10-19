@@ -127,6 +127,7 @@ interface SplitestContextType {
   }) => Promise<void>;
   addComment: (expenseId: string, content: string, authorName?: string) => Promise<void>;
   createGroup: (name: string, category: string, icon: string, memberNames: string[]) => Promise<void>;
+  joinGroup: (groupId: string, role?: 'owner' | 'editor' | 'viewer') => Promise<{ success: boolean; message: string; group?: Group }>;
   updateGroup: (groupId: string, updates: Partial<Group>) => Promise<void>;
   updateSupabaseCredentials: (url: string, anonKey: string) => Promise<boolean>;
   clearSupabaseCredentials: () => void;
@@ -657,133 +658,175 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
       await processOfflineQueue(client);
 
-      const [
-        groupsResponse,
-        membersResponse,
-        expensesResponse,
-        splitsResponse,
-        settlementsResponse,
-        commentsResponse,
-        chatResponse,
-        friendsResponse,
-        authUserData,
-      ] = await Promise.all([
-        client.from('groups').select('*').order('created_at', { ascending: false }),
+      const authUserData = await client.auth.getUser();
+      const authUser = authUserData?.data?.user;
+
+      if (!authUser) {
+        setUserProfile(initialProfile);
+        setGroups([]);
+        setAllExpenses([]);
+        setAllSettlements([]);
+        setAllChatMessages([]);
+        setCustomFriends([]);
+        setSupabaseStatus('connected');
+        saveToLocalStorage([], [], [], [], [], []);
+        return;
+      }
+
+      const googlePhoto =
+        authUser.user_metadata?.avatar_url ||
+        authUser.user_metadata?.picture ||
+        '';
+      const gravatarPhoto = authUser.email ? getGravatarUrl(authUser.email) : '';
+
+      const { data: profileRecord } = await client
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      let effectiveProfile: UserProfile;
+
+      if (profileRecord) {
+        const effectiveAvatar =
+          profileRecord.avatar_url ||
+          googlePhoto ||
+          gravatarPhoto ||
+          '';
+        effectiveProfile = {
+          id: profileRecord.id,
+          email: profileRecord.email || authUser.email || '',
+          fullName: profileRecord.full_name || authUser.user_metadata?.full_name || '',
+          username: profileRecord.username || '',
+          avatarUrl: effectiveAvatar,
+          googleAvatarUrl: googlePhoto,
+          defaultCurrency: profileRecord.default_currency || 'USD',
+          phone: profileRecord.phone || '',
+          paymentHandle: profileRecord.payment_handle || '',
+          themePreference: (profileRecord.theme_preference as ThemeMode) || 'system',
+          googleConnected: profileRecord.google_connected || !!authUser.app_metadata?.provider?.includes('google'),
+          googleEmail: profileRecord.google_email || (authUser.app_metadata?.provider?.includes('google') ? authUser.email : ''),
+          notificationsEnabled: profileRecord.notifications_enabled ?? true,
+          notifyOnExpense: profileRecord.notify_on_expense ?? true,
+          notifyOnSettlement: profileRecord.notify_on_settlement ?? true,
+          notifyOnMention: profileRecord.notify_on_mention ?? true,
+          notifyWeeklyDigest: profileRecord.notify_weekly_digest ?? false,
+        };
+      } else {
+        const effectiveAvatar = googlePhoto || gravatarPhoto || '';
+        const initialName =
+          authUser.user_metadata?.full_name ||
+          authUser.user_metadata?.name ||
+          (authUser.email ? authUser.email.split('@')[0] : 'User');
+        const initialUsername = initialName.toLowerCase().replace(/[^a-z0-9]/g, '.');
+        const newProfile = {
+          id: authUser.id,
+          email: authUser.email || '',
+          full_name: initialName,
+          username: initialUsername,
+          avatar_url: effectiveAvatar,
+          default_currency: 'USD',
+          phone: '',
+          payment_handle: '',
+          theme_preference: 'system',
+          google_connected: !!authUser.app_metadata?.provider?.includes('google'),
+          google_email: authUser.app_metadata?.provider?.includes('google') ? authUser.email : '',
+          notifications_enabled: true,
+          notify_on_expense: true,
+          notify_on_settlement: true,
+          notify_on_mention: true,
+          notify_weekly_digest: false,
+        };
+        await client.from('profiles').upsert(newProfile);
+        effectiveProfile = {
+          id: newProfile.id,
+          email: newProfile.email,
+          fullName: newProfile.full_name,
+          username: newProfile.username,
+          avatarUrl: newProfile.avatar_url,
+          googleAvatarUrl: googlePhoto,
+          defaultCurrency: newProfile.default_currency,
+          phone: newProfile.phone,
+          paymentHandle: newProfile.payment_handle,
+          themePreference: 'system',
+          googleConnected: newProfile.google_connected,
+          googleEmail: newProfile.google_email,
+          notificationsEnabled: true,
+          notifyOnExpense: true,
+          notifyOnSettlement: true,
+          notifyOnMention: true,
+          notifyWeeklyDigest: false,
+        };
+      }
+
+      setUserProfile(effectiveProfile);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(effectiveProfile));
+      }
+
+      const userEmail = (effectiveProfile.email || authUser.email || '').trim().toLowerCase();
+      const userFullName = (effectiveProfile.fullName || authUser.user_metadata?.full_name || '').trim().toLowerCase();
+      const userHandle = (effectiveProfile.username || '').trim().toLowerCase();
+
+      const [createdGroupsRes, allMembersRes, userFriendsRes] = await Promise.all([
+        client.from('groups').select('*').eq('created_by', authUser.id),
         client.from('group_members').select('*'),
-        client.from('expenses').select('*').order('date', { ascending: false }),
-        client.from('expense_splits').select('*'),
-        client.from('settlements').select('*').order('created_at', { ascending: false }),
-        client.from('comments').select('*').order('created_at', { ascending: true }),
-        client.from('chat_messages').select('*').order('created_at', { ascending: true }),
-        client.from('friends').select('*').order('created_at', { ascending: false }),
-        client.auth.getUser(),
+        client.from('friends').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false }),
       ]);
 
-      if (groupsResponse.error) throw groupsResponse.error;
+      const rawMembers = allMembersRes.data || [];
+      const userGroupIds = new Set<string>();
 
-      const authUser = authUserData?.data?.user;
-      if (authUser) {
-        const googlePhoto =
-          authUser.user_metadata?.avatar_url ||
-          authUser.user_metadata?.picture ||
-          '';
-        const gravatarPhoto = authUser.email ? getGravatarUrl(authUser.email) : '';
+      (createdGroupsRes.data || []).forEach((g) => userGroupIds.add(g.id));
 
-        const { data: profileRecord } = await client
-          .from('profiles')
-          .select('*')
-          .eq('id', authUser.id)
-          .maybeSingle();
+      rawMembers.forEach((m) => {
+        const mEmail = (m.email || '').trim().toLowerCase();
+        const mName = (m.name || '').trim().toLowerCase();
+        const mUserId = m.user_id;
 
-        if (profileRecord) {
-          const effectiveAvatar =
-            profileRecord.avatar_url ||
-            googlePhoto ||
-            gravatarPhoto ||
-            '';
-          const loadedProfile: UserProfile = {
-            id: profileRecord.id,
-            email: profileRecord.email || authUser.email || '',
-            fullName: profileRecord.full_name || authUser.user_metadata?.full_name || '',
-            username: profileRecord.username || '',
-            avatarUrl: effectiveAvatar,
-            googleAvatarUrl: googlePhoto,
-            defaultCurrency: profileRecord.default_currency || 'USD',
-            phone: profileRecord.phone || '',
-            paymentHandle: profileRecord.payment_handle || '',
-            themePreference: (profileRecord.theme_preference as ThemeMode) || 'system',
-            googleConnected: profileRecord.google_connected || !!authUser.app_metadata?.provider?.includes('google'),
-            googleEmail: profileRecord.google_email || (authUser.app_metadata?.provider?.includes('google') ? authUser.email : ''),
-            notificationsEnabled: profileRecord.notifications_enabled ?? true,
-            notifyOnExpense: profileRecord.notify_on_expense ?? true,
-            notifyOnSettlement: profileRecord.notify_on_settlement ?? true,
-            notifyOnMention: profileRecord.notify_on_mention ?? true,
-            notifyWeeklyDigest: profileRecord.notify_weekly_digest ?? false,
-          };
-          setUserProfile(loadedProfile);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(loadedProfile));
-          }
-        } else {
-          const effectiveAvatar = googlePhoto || gravatarPhoto || '';
-          const initialName =
-            authUser.user_metadata?.full_name ||
-            authUser.user_metadata?.name ||
-            (authUser.email ? authUser.email.split('@')[0] : 'User');
-          const initialUsername = initialName.toLowerCase().replace(/[^a-z0-9]/g, '.');
-          const newProfile = {
-            id: authUser.id,
-            email: authUser.email || '',
-            full_name: initialName,
-            username: initialUsername,
-            avatar_url: effectiveAvatar,
-            default_currency: 'USD',
-            phone: '',
-            payment_handle: '',
-            theme_preference: 'system',
-            google_connected: !!authUser.app_metadata?.provider?.includes('google'),
-            google_email: authUser.app_metadata?.provider?.includes('google') ? authUser.email : '',
-            notifications_enabled: true,
-            notify_on_expense: true,
-            notify_on_settlement: true,
-            notify_on_mention: true,
-            notify_weekly_digest: false,
-          };
-          await client.from('profiles').upsert(newProfile);
-          const loadedProfile: UserProfile = {
-            id: newProfile.id,
-            email: newProfile.email,
-            fullName: newProfile.full_name,
-            username: newProfile.username,
-            avatarUrl: newProfile.avatar_url,
-            googleAvatarUrl: googlePhoto,
-            defaultCurrency: newProfile.default_currency,
-            phone: newProfile.phone,
-            paymentHandle: newProfile.payment_handle,
-            themePreference: 'system',
-            googleConnected: newProfile.google_connected,
-            googleEmail: newProfile.google_email,
-            notificationsEnabled: true,
-            notifyOnExpense: true,
-            notifyOnSettlement: true,
-            notifyOnMention: true,
-            notifyWeeklyDigest: false,
-          };
-          setUserProfile(loadedProfile);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(loadedProfile));
-          }
+        if (
+          (mUserId && mUserId === authUser.id) ||
+          (userEmail && mEmail === userEmail) ||
+          (userFullName && mName === userFullName) ||
+          (userHandle && mName === userHandle)
+        ) {
+          userGroupIds.add(m.group_id);
         }
+      });
+
+      const builtFriends: FriendContact[] = (userFriendsRes.data || []).map((f) => ({
+        id: f.id,
+        name: f.name,
+        username: f.username || f.name.toLowerCase().replace(/[^a-z0-9]/g, '.'),
+        email: f.email || '',
+        avatarUrl: f.avatar_url || (f.email ? getGravatarUrl(f.email) : ''),
+        netBalance: Number(f.net_balance) || 0,
+        groupCount: Number(f.group_count) || 0,
+        addedVia: f.added_via || 'directory',
+      }));
+
+      if (userGroupIds.size === 0) {
+        setGroups([]);
+        setAllExpenses([]);
+        setAllSettlements([]);
+        setAllChatMessages([]);
+        setCustomFriends(builtFriends);
+        setSupabaseStatus('connected');
+        saveToLocalStorage([], [], [], [], [], builtFriends);
+        return;
       }
 
-      const rawSupabaseGroups = groupsResponse.data || [];
-      const hasMockGroupInDb = rawSupabaseGroups.some((item) => item.id === 'group-bali-retreat');
-      if (hasMockGroupInDb) {
-        void client.from('groups').delete().eq('id', 'group-bali-retreat');
-      }
+      const groupIdsArray = Array.from(userGroupIds);
+      const [groupsRes, expensesRes, splitsRes, settlementsRes, commentsRes, chatRes] = await Promise.all([
+        client.from('groups').select('*').in('id', groupIdsArray).order('created_at', { ascending: false }),
+        client.from('expenses').select('*').in('group_id', groupIdsArray).order('date', { ascending: false }),
+        client.from('expense_splits').select('*'),
+        client.from('settlements').select('*').in('group_id', groupIdsArray).order('created_at', { ascending: false }),
+        client.from('comments').select('*').order('created_at', { ascending: true }),
+        client.from('chat_messages').select('*').in('group_id', groupIdsArray).order('created_at', { ascending: true }),
+      ]);
 
-      const fetchedMembers = membersResponse.data || [];
-      const builtGroups: Group[] = rawSupabaseGroups
+      const builtGroups: Group[] = (groupsRes.data || [])
         .filter((item) => item.id !== 'group-bali-retreat')
         .map((item) => ({
           id: item.id,
@@ -798,65 +841,110 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               ? item.user_role
               : 'editor',
           createdAt: item.created_at,
-          members: fetchedMembers
+          members: rawMembers
             .filter((m) => m.group_id === item.id)
-            .map((m) => ({
-              id: m.id,
-              groupId: m.group_id,
-              name: m.name,
-              email: m.email,
-              avatarUrl: m.avatar_url || (m.email ? getGravatarUrl(m.email) : ''),
-              role: m.role === 'owner' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'editor',
-              isCurrentUser: m.is_current_user || false,
-            })),
+            .map((m) => {
+              const isCurrent =
+                m.user_id === authUser.id ||
+                (userEmail && (m.email || '').trim().toLowerCase() === userEmail) ||
+                (userFullName && (m.name || '').trim().toLowerCase() === userFullName) ||
+                (userHandle && (m.name || '').trim().toLowerCase() === userHandle) ||
+                m.name === 'You';
+              const realName =
+                m.name === 'You' && isCurrent
+                  ? effectiveProfile.fullName || effectiveProfile.username || 'User'
+                  : m.name;
+
+              if (m.name === 'You' && isCurrent) {
+                void client.from('group_members').update({
+                  name: realName,
+                  email: effectiveProfile.email,
+                  user_id: authUser.id,
+                }).eq('id', m.id);
+              }
+
+              return {
+                id: m.id,
+                groupId: m.group_id,
+                name: realName,
+                email: m.email || (isCurrent ? effectiveProfile.email : ''),
+                avatarUrl: m.avatar_url || (m.email ? getGravatarUrl(m.email) : isCurrent ? effectiveProfile.avatarUrl || '' : ''),
+                role: m.role === 'owner' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'editor',
+                isCurrentUser: isCurrent,
+                userId: m.user_id || (isCurrent ? authUser.id : undefined),
+              };
+            }),
         }));
 
-      const fetchedSplits = splitsResponse.data || [];
-      const fetchedComments = commentsResponse.data || [];
+      const fetchedSplits = splitsRes.data || [];
+      const fetchedComments = commentsRes.data || [];
 
-      const builtExpenses: Expense[] = (expensesResponse.data || [])
+      const builtExpenses: Expense[] = (expensesRes.data || [])
         .filter((exp) => exp.group_id !== 'group-bali-retreat')
-        .map((exp) => ({
-          id: exp.id,
-          groupId: exp.group_id,
-          description: exp.description,
-          amount: Number(exp.amount),
-          currencyCode: exp.currency_code || 'USD',
-          exchangeRateToGroup: Number(exp.exchange_rate_to_group) || 1.0,
-          category: exp.category,
-          paidByName: exp.paid_by_name || 'You',
-          splitMethod: exp.split_method || 'equal',
-          date: exp.date,
-          hasReceipt: exp.has_receipt,
-          createdAt: exp.created_at,
-          splits: fetchedSplits
-            .filter((s) => s.expense_id === exp.id)
-            .map((s) => ({
-              id: s.id,
-              expenseId: s.expense_id,
-              memberName: s.member_name,
-              shareAmount: Number(s.share_amount),
-              percentage: s.percentage ? Number(s.percentage) : undefined,
-              shares: s.shares ? Number(s.shares) : undefined,
-            })),
-          comments: fetchedComments
-            .filter((c) => c.expense_id === exp.id)
-            .map((c) => ({
-              id: c.id,
-              expenseId: c.expense_id,
-              authorName: c.author_name,
-              content: c.content,
-              createdAt: c.created_at,
-            })),
-        }));
+        .map((exp) => {
+          const isPayerCurrent =
+            exp.paid_by_name === 'You' ||
+            exp.paid_by_name === effectiveProfile.fullName ||
+            exp.paid_by_name === effectiveProfile.username;
+          const resolvedPayerName =
+            exp.paid_by_name === 'You' && isPayerCurrent
+              ? effectiveProfile.fullName || effectiveProfile.username || 'User'
+              : exp.paid_by_name || 'User';
 
-      const builtSettlements: Settlement[] = (settlementsResponse.data || [])
+          return {
+            id: exp.id,
+            groupId: exp.group_id,
+            description: exp.description,
+            amount: Number(exp.amount),
+            currencyCode: exp.currency_code || 'USD',
+            exchangeRateToGroup: Number(exp.exchange_rate_to_group) || 1.0,
+            category: exp.category,
+            paidByName: resolvedPayerName,
+            splitMethod: exp.split_method || 'equal',
+            date: exp.date,
+            hasReceipt: exp.has_receipt,
+            createdAt: exp.created_at,
+            splits: fetchedSplits
+              .filter((s) => s.expense_id === exp.id)
+              .map((s) => ({
+                id: s.id,
+                expenseId: s.expense_id,
+                memberName:
+                  s.member_name === 'You'
+                    ? effectiveProfile.fullName || effectiveProfile.username || 'User'
+                    : s.member_name,
+                shareAmount: Number(s.share_amount),
+                percentage: s.percentage ? Number(s.percentage) : undefined,
+                shares: s.shares ? Number(s.shares) : undefined,
+              })),
+            comments: fetchedComments
+              .filter((c) => c.expense_id === exp.id)
+              .map((c) => ({
+                id: c.id,
+                expenseId: c.expense_id,
+                authorName:
+                  c.author_name === 'You'
+                    ? effectiveProfile.fullName || effectiveProfile.username || 'User'
+                    : c.author_name,
+                content: c.content,
+                createdAt: c.created_at,
+              })),
+          };
+        });
+
+      const builtSettlements: Settlement[] = (settlementsRes.data || [])
         .filter((set) => set.group_id !== 'group-bali-retreat')
         .map((set) => ({
           id: set.id,
           groupId: set.group_id,
-          payerName: set.payer_name,
-          recipientName: set.recipient_name,
+          payerName:
+            set.payer_name === 'You'
+              ? effectiveProfile.fullName || effectiveProfile.username || 'User'
+              : set.payer_name,
+          recipientName:
+            set.recipient_name === 'You'
+              ? effectiveProfile.fullName || effectiveProfile.username || 'User'
+              : set.recipient_name,
           amount: Number(set.amount),
           currencyCode: set.currency_code || 'USD',
           method: set.method,
@@ -864,31 +952,30 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           createdAt: set.created_at,
         }));
 
-      const builtChatMessages: GroupChatMessage[] = (chatResponse.data || [])
+      const builtChatMessages: GroupChatMessage[] = (chatRes.data || [])
         .filter((c) => c.group_id !== 'group-bali-retreat')
-        .map((c) => ({
-          id: c.id,
-          groupId: c.group_id,
-          senderName: c.sender_name,
-          senderAvatarUrl: c.sender_avatar_url,
-          senderIsCurrentUser: c.sender_is_current_user,
-          content: c.content,
-          mentions: c.mentions || [],
-          attachment: c.attachment || undefined,
-          likes: c.likes || [],
-          createdAt: c.created_at,
-        }));
-
-      const builtFriends: FriendContact[] = (friendsResponse.data || []).map((f) => ({
-        id: f.id,
-        name: f.name,
-        username: f.username || f.name.toLowerCase().replace(/[^a-z0-9]/g, '.'),
-        email: f.email || '',
-        avatarUrl: f.avatar_url || (f.email ? getGravatarUrl(f.email) : ''),
-        netBalance: Number(f.net_balance) || 0,
-        groupCount: Number(f.group_count) || 0,
-        addedVia: f.added_via || 'directory',
-      }));
+        .map((c) => {
+          const isSenderCurrent =
+            c.sender_name === effectiveProfile.fullName ||
+            c.sender_name === effectiveProfile.username ||
+            c.sender_name === 'You' ||
+            c.sender_is_current_user;
+          return {
+            id: c.id,
+            groupId: c.group_id,
+            senderName:
+              c.sender_name === 'You'
+                ? effectiveProfile.fullName || effectiveProfile.username || 'User'
+                : c.sender_name,
+            senderAvatarUrl: c.sender_avatar_url,
+            senderIsCurrentUser: isSenderCurrent,
+            content: c.content,
+            mentions: c.mentions || [],
+            attachment: c.attachment || undefined,
+            likes: c.likes || [],
+            createdAt: c.created_at,
+          };
+        });
 
       setGroups(builtGroups);
       setAllExpenses(builtExpenses);
@@ -943,6 +1030,15 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     } = client.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
         document.cookie = "splitest_session=; path=/; max-age=0";
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(STORAGE_GROUPS_KEY);
+          window.localStorage.removeItem(STORAGE_EXPENSES_KEY);
+          window.localStorage.removeItem(STORAGE_SETTLEMENTS_KEY);
+          window.localStorage.removeItem(STORAGE_ACTIVITIES_KEY);
+          window.localStorage.removeItem(STORAGE_CHAT_KEY);
+          window.localStorage.removeItem(STORAGE_FRIENDS_KEY);
+          window.localStorage.removeItem(STORAGE_PROFILE_KEY);
+        }
         window.location.href = "/login";
       } else if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
         document.cookie = `splitest_session=authenticated; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
@@ -1107,6 +1203,12 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const newId = `exp-${Date.now()}`;
       const nowIso = new Date().toISOString();
 
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const resolvedPaidByName =
+        !expenseData.paidByName || expenseData.paidByName === 'You'
+          ? currentUserName
+          : expenseData.paidByName;
+
       const targetGroup = groups.find((g) => g.id === expenseData.groupId);
       const groupCurrency = targetGroup?.defaultCurrency || 'USD';
 
@@ -1118,14 +1220,17 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         currencyCode: groupCurrency,
         exchangeRateToGroup: 1.0,
         category: expenseData.category,
-        paidByName: expenseData.paidByName,
+        paidByName: resolvedPaidByName,
         splitMethod: expenseData.splitMethod,
         date: expenseData.date,
         hasReceipt: expenseData.hasReceipt,
         splits: expenseData.splits.map((split, index) => ({
           id: `split-${newId}-${index}`,
           expenseId: newId,
-          memberName: split.memberName,
+          memberName:
+            !split.memberName || split.memberName === 'You'
+              ? currentUserName
+              : split.memberName,
           shareAmount: Number(split.shareAmount),
           percentage: split.percentage,
           shares: split.shares,
@@ -1137,7 +1242,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const newActivity: ActivityFeedItem = {
         id: `act-${Date.now()}`,
         type: 'expense_created',
-        title: `${expenseData.paidByName === 'You' ? 'You' : expenseData.paidByName} added ${expenseData.description}`,
+        title: `${resolvedPaidByName} added ${expenseData.description}`,
         subtitle: `Just now • ${formatCurrency(Number(expenseData.amount), groupCurrency)}`,
         timestamp: nowIso,
         iconName: 'receipt',
@@ -1274,6 +1379,12 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const targetGroup = groups.find((g) => g.id === existing.groupId);
       const groupCurrency = targetGroup?.defaultCurrency || existing.currencyCode || 'USD';
 
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const resolvedPaidByName =
+        !expenseData.paidByName || expenseData.paidByName === 'You'
+          ? currentUserName
+          : expenseData.paidByName;
+
       const updatedExpense: Expense = {
         ...existing,
         description: expenseData.description,
@@ -1281,13 +1392,16 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         currencyCode: groupCurrency,
         exchangeRateToGroup: 1.0,
         category: expenseData.category,
-        paidByName: expenseData.paidByName,
+        paidByName: resolvedPaidByName,
         splitMethod: expenseData.splitMethod,
         hasReceipt: expenseData.hasReceipt,
         splits: expenseData.splits.map((split, index) => ({
           id: `split-${id}-${index}`,
           expenseId: id,
-          memberName: split.memberName,
+          memberName:
+            !split.memberName || split.memberName === 'You'
+              ? currentUserName
+              : split.memberName,
           shareAmount: Number(split.shareAmount),
           percentage: split.percentage,
           shares: split.shares,
@@ -1367,12 +1481,21 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     }) => {
       const newId = `settle-${Date.now()}`;
       const nowIso = new Date().toISOString();
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const resolvedPayerName =
+        !settlementData.payerName || settlementData.payerName === 'You'
+          ? currentUserName
+          : settlementData.payerName;
+      const resolvedRecipientName =
+        !settlementData.recipientName || settlementData.recipientName === 'You'
+          ? currentUserName
+          : settlementData.recipientName;
 
       const newSettlement: Settlement = {
         id: newId,
         groupId: settlementData.groupId,
-        payerName: settlementData.payerName,
-        recipientName: settlementData.recipientName,
+        payerName: resolvedPayerName,
+        recipientName: resolvedRecipientName,
         amount: Number(settlementData.amount),
         currencyCode: 'USD',
         method: settlementData.method,
@@ -1383,7 +1506,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const newActivity: ActivityFeedItem = {
         id: `act-${Date.now()}`,
         type: 'settlement_recorded',
-        title: `${settlementData.payerName} paid ${settlementData.recipientName}`,
+        title: `${resolvedPayerName} paid ${resolvedRecipientName}`,
         subtitle: `Just now • $${Number(settlementData.amount).toFixed(2)} via ${settlementData.method}`,
         timestamp: nowIso,
         iconName: 'handshake',
@@ -1442,11 +1565,14 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addComment = useCallback(
-    async (expenseId: string, content: string, authorName = 'You') => {
+    async (expenseId: string, content: string, authorName?: string) => {
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const resolvedAuthor =
+        !authorName || authorName === 'You' ? currentUserName : authorName;
       const newComment = {
         id: `comm-${Date.now()}`,
         expenseId,
-        authorName,
+        authorName: resolvedAuthor,
         content,
         createdAt: new Date().toISOString(),
       };
@@ -1502,8 +1628,9 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     async (name: string, category: string, icon: string, memberNames: string[]) => {
       const newGroupId = `group-${Date.now()}`;
       const nowIso = new Date().toISOString();
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
 
-      const memberList = Array.from(new Set(['You', ...memberNames.filter(Boolean)]));
+      const memberList = Array.from(new Set([currentUserName, ...memberNames.filter(Boolean)]));
       const newGroup: Group = {
         id: newGroupId,
         name,
@@ -1514,15 +1641,18 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         simplifyDebts: true,
         userRole: 'owner',
         createdAt: nowIso,
-        members: memberList.map((mName, index) => ({
-          id: `member-${newGroupId}-${index}`,
-          groupId: newGroupId,
-          name: mName,
-          email: mName === 'You' ? userProfile.email : '',
-          avatarUrl: mName === 'You' ? userProfile.avatarUrl || '' : '',
-          role: mName === 'You' ? 'owner' : 'editor',
-          isCurrentUser: mName === 'You',
-        })),
+        members: memberList.map((mName, index) => {
+          const isSelf = mName === currentUserName;
+          return {
+            id: `member-${newGroupId}-${index}`,
+            groupId: newGroupId,
+            name: mName,
+            email: isSelf ? userProfile.email : '',
+            avatarUrl: isSelf ? userProfile.avatarUrl || '' : '',
+            role: isSelf ? 'owner' : 'editor',
+            isCurrentUser: isSelf,
+          };
+        }),
       };
 
       const updatedGroups = [newGroup, ...groups];
@@ -1543,6 +1673,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             default_currency: newGroup.defaultCurrency,
             simplify_debts: newGroup.simplifyDebts,
             user_role: newGroup.userRole,
+            created_by: userProfile.id || null,
             created_at: newGroup.createdAt,
           });
 
@@ -1554,12 +1685,12 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             avatar_url: m.avatarUrl,
             role: m.role,
             is_current_user: m.isCurrentUser,
+            user_id: m.isCurrentUser ? userProfile.id || null : null,
           }));
           await client.from('group_members').upsert(membersToInsert);
           showToast(`Group "${name}" synced to database`);
           return;
         } catch {
-          // fallback
         }
       }
 
@@ -1577,12 +1708,95 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       allExpenses,
       allSettlements,
       activities,
+      userProfile,
       isOnline,
       saveToLocalStorage,
       broadcastLocalEvent,
       refreshPendingCount,
       showToast,
     ]
+  );
+
+  const joinGroup = useCallback(
+    async (
+      groupId: string,
+      role: 'owner' | 'editor' | 'viewer' = 'editor'
+    ): Promise<{ success: boolean; message: string; group?: Group }> => {
+      const client = getSupabaseClient();
+      if (!client) {
+        return { success: false, message: 'Database connection unavailable' };
+      }
+
+      try {
+        const { data: targetGroupData, error: groupErr } = await client
+          .from('groups')
+          .select('*')
+          .eq('id', groupId)
+          .maybeSingle();
+
+        if (groupErr || !targetGroupData) {
+          return { success: false, message: 'Group not found or invite has expired' };
+        }
+
+        const currentUserName = userProfile.fullName || userProfile.username || 'Member';
+        const currentUserEmail = (userProfile.email || '').trim().toLowerCase();
+
+        const { data: existingMembers } = await client
+          .from('group_members')
+          .select('*')
+          .eq('group_id', groupId);
+
+        const alreadyMember = (existingMembers || []).some((m) => {
+          if (userProfile.id && m.user_id === userProfile.id) return true;
+          if (currentUserEmail && m.email && m.email.trim().toLowerCase() === currentUserEmail) return true;
+          if (currentUserName && m.name.trim().toLowerCase() === currentUserName.trim().toLowerCase()) return true;
+          return false;
+        });
+
+        if (!alreadyMember) {
+          const newMemberId = `member-${groupId}-${Date.now()}`;
+          await client.from('group_members').insert({
+            id: newMemberId,
+            group_id: groupId,
+            name: currentUserName,
+            email: userProfile.email || '',
+            avatar_url: userProfile.avatarUrl || '',
+            role: role || 'editor',
+            is_current_user: false,
+            user_id: userProfile.id || null,
+          });
+
+          await client.from('activity_logs').insert({
+            id: `act-${Date.now()}`,
+            group_id: groupId,
+            type: 'member_joined',
+            title: `${currentUserName} joined the group via invite`,
+            subtitle: `${role === 'viewer' ? 'View only' : 'Can edit'} access`,
+            icon_name: 'UserPlus',
+            icon_color_class: 'text-[#059669]',
+            timestamp: new Date().toISOString(),
+          });
+
+          await client.from('chat_messages').insert({
+            id: `chat-${Date.now()}`,
+            group_id: groupId,
+            sender_name: 'System',
+            sender_avatar_url: '',
+            sender_is_current_user: false,
+            content: `${currentUserName} joined the group via invite`,
+            created_at: new Date().toISOString(),
+          });
+        }
+
+        await fetchSupabaseDataRef.current();
+        setActiveGroupId(groupId);
+        showToast(`Joined group "${targetGroupData.name}"`);
+        return { success: true, message: `Joined group "${targetGroupData.name}"` };
+      } catch {
+        return { success: false, message: 'Failed to join group. Please try again.' };
+      }
+    },
+    [userProfile, showToast]
   );
 
   const updateGroup = useCallback(
@@ -1840,10 +2054,11 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       attachment?: ChatAttachment;
     }) => {
       const nowIso = new Date().toISOString();
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
       const newMessage: GroupChatMessage = {
         id: `chat-${Date.now()}`,
         groupId: data.groupId,
-        senderName: userProfile.fullName || 'You',
+        senderName: currentUserName,
         senderAvatarUrl: userProfile.avatarUrl,
         senderIsCurrentUser: true,
         content: data.content,
@@ -1858,7 +2073,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           try {
             window.localStorage.setItem(STORAGE_CHAT_KEY, JSON.stringify(next));
           } catch {
-            // ignore
           }
         }
         void cacheItems('chat_messages', next);
@@ -1884,7 +2098,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           });
           return;
         } catch {
-          // fallback
         }
       }
 
@@ -1903,7 +2116,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
     (name: string, category: string, memberNames: string[]) => {
       const newGroupId = `group-${Date.now()}`;
       const nowIso = new Date().toISOString();
-      const memberList = Array.from(new Set(['You', ...memberNames.filter(Boolean)]));
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const memberList = Array.from(new Set([currentUserName, ...memberNames.filter(Boolean)]));
       const newGroup: Group = {
         id: newGroupId,
         name,
@@ -1914,15 +2128,18 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         simplifyDebts: true,
         userRole: 'owner',
         createdAt: nowIso,
-        members: memberList.map((mName, index) => ({
-          id: `member-${newGroupId}-${index}`,
-          groupId: newGroupId,
-          name: mName,
-          email: mName === 'You' ? userProfile.email : '',
-          avatarUrl: mName === 'You' ? userProfile.avatarUrl || '' : '',
-          role: mName === 'You' ? 'owner' : 'editor',
-          isCurrentUser: mName === 'You',
-        })),
+        members: memberList.map((mName, index) => {
+          const isSelf = mName === currentUserName;
+          return {
+            id: `member-${newGroupId}-${index}`,
+            groupId: newGroupId,
+            name: mName,
+            email: isSelf ? userProfile.email : '',
+            avatarUrl: isSelf ? userProfile.avatarUrl || '' : '',
+            role: isSelf ? 'owner' : 'editor',
+            isCurrentUser: isSelf,
+          };
+        }),
       };
 
       setGroups((prev) => {
@@ -1948,7 +2165,20 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           default_currency: newGroup.defaultCurrency,
           simplify_debts: newGroup.simplifyDebts,
           user_role: newGroup.userRole,
+          created_by: userProfile.id || null,
           created_at: newGroup.createdAt,
+        }).then(() => {
+          const membersToInsert = newGroup.members.map((m) => ({
+            id: m.id,
+            group_id: newGroup.id,
+            name: m.name,
+            email: m.email,
+            avatar_url: m.avatarUrl,
+            role: m.role,
+            is_current_user: m.isCurrentUser,
+            user_id: m.isCurrentUser ? userProfile.id || null : null,
+          }));
+          return client.from('group_members').upsert(membersToInsert);
         });
       } else {
         void queueMutation({
@@ -1961,7 +2191,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
       return newGroupId;
     },
-    [isOnline, refreshPendingCount, showToast, userProfile.email, userProfile.avatarUrl]
+    [isOnline, refreshPendingCount, showToast, userProfile]
   );
 
   const addMembersToGroup = useCallback(
@@ -2032,7 +2262,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
 
   const toggleChatMessageLike = useCallback(
     async (messageId: string) => {
-      const currentUserName = userProfile.fullName || 'You';
+      const currentUserName = userProfile.fullName || userProfile.username || 'User';
       let nextLikes: string[] = [];
 
       setAllChatMessages((prev) => {
@@ -2055,7 +2285,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           try {
             window.localStorage.setItem(STORAGE_CHAT_KEY, JSON.stringify(next));
           } catch {
-            // ignore
           }
         }
         void cacheItems('chat_messages', next);
@@ -2068,7 +2297,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           await client.from('chat_messages').update({ likes: nextLikes }).eq('id', messageId);
           return;
         } catch {
-          // fallback
         }
       }
 
@@ -2080,7 +2308,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       });
       await refreshPendingCount();
     },
-    [userProfile.fullName, isOnline, refreshPendingCount]
+    [userProfile.fullName, userProfile.username, isOnline, refreshPendingCount]
   );
 
   const applyThemeToDocument = useCallback((mode: ThemeMode) => {
@@ -2106,7 +2334,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         try {
           window.localStorage.setItem(STORAGE_THEME_KEY, newTheme);
         } catch {
-          // ignore
         }
       }
       applyThemeToDocument(newTheme);
@@ -2178,6 +2405,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         try {
           await client.from('friends').upsert({
             id: friend.id,
+            user_id: userProfile.id || null,
             name: friend.name,
             username: friend.username,
             email: friend.email,
@@ -2188,7 +2416,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           showToast(`Added @${friend.username} as friend`);
           return;
         } catch {
-          // fallback
         }
       }
 
@@ -2310,6 +2537,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       addSettlement,
       addComment,
       createGroup,
+      joinGroup,
       updateGroup,
       updateSupabaseCredentials,
       clearSupabaseCredentials,
@@ -2374,6 +2602,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       addSettlement,
       addComment,
       createGroup,
+      joinGroup,
       updateGroup,
       updateSupabaseCredentials,
       clearSupabaseCredentials,

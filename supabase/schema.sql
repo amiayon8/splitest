@@ -129,6 +129,17 @@ create table if not exists activity_logs (
   icon_color_class text
 );
 
+create table if not exists group_invites (
+  id text primary key,
+  group_id text not null references groups(id) on delete cascade,
+  role text not null default 'editor',
+  created_by text,
+  created_at timestamptz not null default now()
+);
+
+alter table group_members add column if not exists user_id text;
+alter table friends add column if not exists user_id text;
+
 alter table profiles enable row level security;
 alter table groups enable row level security;
 alter table group_members enable row level security;
@@ -139,6 +150,7 @@ alter table settlements enable row level security;
 alter table chat_messages enable row level security;
 alter table friends enable row level security;
 alter table activity_logs enable row level security;
+alter table group_invites enable row level security;
 
 create policy "Allow all access to profiles" on profiles for all to anon, authenticated using (true) with check (true);
 create policy "Allow all access to groups" on groups for all to anon, authenticated using (true) with check (true);
@@ -150,6 +162,7 @@ create policy "Allow all access to settlements" on settlements for all to anon, 
 create policy "Allow all access to chat_messages" on chat_messages for all to anon, authenticated using (true) with check (true);
 create policy "Allow all access to friends" on friends for all to anon, authenticated using (true) with check (true);
 create policy "Allow all access to activity_logs" on activity_logs for all to anon, authenticated using (true) with check (true);
+create policy "Allow all access to group_invites" on group_invites for all to anon, authenticated using (true) with check (true);
 
 alter publication supabase_realtime add table profiles;
 alter publication supabase_realtime add table groups;
@@ -161,3 +174,4 @@ alter publication supabase_realtime add table settlements;
 alter publication supabase_realtime add table chat_messages;
 alter publication supabase_realtime add table friends;
 alter publication supabase_realtime add table activity_logs;
+alter publication supabase_realtime add table group_invites;

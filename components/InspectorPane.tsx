@@ -9,6 +9,7 @@ import {
   calculateSimplifiedDebts,
   calculateDirectDebts,
   calculateCategoryBreakdown,
+  getCurrentUserMemberName,
 } from '@/lib/split-calculator';
 import {
   ArrowRight,
@@ -40,9 +41,17 @@ export function InspectorPane() {
     isViewOnly,
     activeCurrency,
     setIsLedgerSettingsModalOpen,
+    userProfile,
   } = useSplitest();
 
   const [commentText, setCommentText] = useState('');
+
+  const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
+  const isSelf = (name: string) =>
+    name === currentMemberName ||
+    name === 'You' ||
+    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
+    (Boolean(userProfile?.username) && name === userProfile.username);
 
   const memberNames = useMemo(() => activeGroup.members.map((m) => m.name), [activeGroup]);
 
@@ -83,7 +92,7 @@ export function InspectorPane() {
     if (!commentText.trim() || !selectedExpense) return;
     const content = commentText.trim();
     setCommentText('');
-    await addComment(selectedExpense.id, content, 'You');
+    await addComment(selectedExpense.id, content, currentMemberName);
   };
 
   const circumference = 2 * Math.PI * 38;
@@ -169,8 +178,8 @@ export function InspectorPane() {
                 </div>
               ) : (
                 debts.map((item, index) => {
-                  const isYouDebtor = item.debtor === 'You';
-                  const isYouCreditor = item.creditor === 'You';
+                  const isYouDebtor = isSelf(item.debtor);
+                  const isYouCreditor = isSelf(item.creditor);
 
                   return (
                     <div
@@ -183,7 +192,7 @@ export function InspectorPane() {
                             isYouDebtor ? 'text-[#E11D48] dark:text-[#FB7185]' : 'text-slate-800 dark:text-slate-200'
                           }`}
                         >
-                          {item.debtor}
+                          {item.debtor}{isYouDebtor && !item.debtor.includes('(You)') ? ' (You)' : ''}
                         </span>
                         <ArrowRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                         <span
@@ -191,7 +200,7 @@ export function InspectorPane() {
                             isYouCreditor ? 'text-[#059669] dark:text-[#34D399]' : 'text-slate-800 dark:text-slate-200'
                           }`}
                         >
-                          {item.creditor}
+                          {item.creditor}{isYouCreditor && !item.creditor.includes('(You)') ? ' (You)' : ''}
                         </span>
                       </div>
 
@@ -249,7 +258,7 @@ export function InspectorPane() {
                         className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
                       />
                       <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                        {member.name}
+                        {member.name}{isSelf(member.name) && !member.name.includes('(You)') ? ' (You)' : ''}
                       </span>
                     </div>
 
@@ -393,7 +402,11 @@ export function InspectorPane() {
             <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1 pt-1 border-t border-slate-200/60 dark:border-slate-800">
               <div className="flex justify-between">
                 <span>Paid by:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedExpense.paidByName}</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {isSelf(selectedExpense.paidByName) && !selectedExpense.paidByName.includes('(You)')
+                    ? `${selectedExpense.paidByName} (You)`
+                    : selectedExpense.paidByName}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Date:</span>

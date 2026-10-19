@@ -8,6 +8,7 @@ import {
   calculateSimplifiedDebts,
   calculateDirectDebts,
   calculateCategoryBreakdown,
+  getCurrentUserMemberName,
 } from '@/lib/split-calculator';
 import {
   ArrowRight,
@@ -26,7 +27,15 @@ export function AnalyticsView() {
     showToast,
     isViewOnly,
     activeCurrency,
+    userProfile,
   } = useSplitest();
+
+  const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
+  const isSelf = (name: string) =>
+    name === currentMemberName ||
+    name === 'You' ||
+    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
+    (Boolean(userProfile?.username) && name === userProfile.username);
 
   const memberNames = useMemo(() => activeGroup.members.map((m) => m.name), [activeGroup]);
 
@@ -206,8 +215,8 @@ export function AnalyticsView() {
         ) : (
           <div className="flex flex-col gap-2.5">
             {debts.map((item, index) => {
-              const isYouDebtor = item.debtor === 'You';
-              const isYouCreditor = item.creditor === 'You';
+              const isYouDebtor = isSelf(item.debtor);
+              const isYouCreditor = isSelf(item.creditor);
 
               return (
                 <div
@@ -220,7 +229,7 @@ export function AnalyticsView() {
                         isYouDebtor ? 'text-[#E11D48] dark:text-[#FB7185]' : 'text-slate-900 dark:text-slate-100'
                       }`}
                     >
-                      {item.debtor}
+                      {item.debtor}{isYouDebtor && !item.debtor.includes('(You)') ? ' (You)' : ''}
                     </span>
                     <ArrowRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                     <span
@@ -228,7 +237,7 @@ export function AnalyticsView() {
                         isYouCreditor ? 'text-[#059669] dark:text-[#34D399]' : 'text-slate-900 dark:text-slate-100'
                       }`}
                     >
-                      {item.creditor}
+                      {item.creditor}{isYouCreditor && !item.creditor.includes('(You)') ? ' (You)' : ''}
                     </span>
                   </div>
 

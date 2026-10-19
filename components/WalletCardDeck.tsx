@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useSplitest } from "@/lib/store";
 import { formatCurrency } from "@/lib/currency";
-import { calculateMemberBalances } from "@/lib/split-calculator";
+import { calculateMemberBalances, getCurrentUserBalance, getCurrentUserMemberName } from "@/lib/split-calculator";
 import {
   Plus,
   Handshake,
@@ -28,6 +28,7 @@ export function WalletCardDeck() {
     setIsLedgerSettingsModalOpen,
     setIsNewGroupModalOpen,
     activeCurrency,
+    userProfile,
   } = useSplitest();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,29 +66,31 @@ export function WalletCardDeck() {
         gExpenses,
         gSettlements,
       );
-      const net = balances["You"]?.netBalance || 0;
+      const currentMemberName = getCurrentUserMemberName(group, userProfile);
+      const isSelf = (n: string) => n === currentMemberName || n === "You";
+      const net = getCurrentUserBalance(balances, group, userProfile)?.netBalance || 0;
 
       let youOwe = 0;
       for (const exp of gExpenses) {
-        if (exp.paidByName !== "You") {
-          const yourSplit = exp.splits.find((s) => s.memberName === "You");
+        if (!isSelf(exp.paidByName)) {
+          const yourSplit = exp.splits.find((s) => isSelf(s.memberName));
           if (yourSplit) youOwe += yourSplit.shareAmount;
         }
       }
       for (const settle of gSettlements) {
-        if (settle.payerName === "You") youOwe -= settle.amount;
+        if (isSelf(settle.payerName)) youOwe -= settle.amount;
       }
 
       let youAreOwed = 0;
       for (const exp of gExpenses) {
-        if (exp.paidByName === "You") {
+        if (isSelf(exp.paidByName)) {
           for (const split of exp.splits) {
-            if (split.memberName !== "You") youAreOwed += split.shareAmount;
+            if (!isSelf(split.memberName)) youAreOwed += split.shareAmount;
           }
         }
       }
       for (const settle of gSettlements) {
-        if (settle.recipientName === "You") youAreOwed -= settle.amount;
+        if (isSelf(settle.recipientName)) youAreOwed -= settle.amount;
       }
 
       map[group.id] = {
@@ -97,7 +100,7 @@ export function WalletCardDeck() {
       };
     }
     return map;
-  }, [groups, allExpenses, allSettlements]);
+  }, [groups, allExpenses, allSettlements, userProfile]);
 
   const centerCardInContainer = (index: number, behavior: ScrollBehavior = "smooth") => {
     const container = containerRef.current;

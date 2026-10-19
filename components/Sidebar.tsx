@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useSplitest } from "@/lib/store";
 import { formatCurrency } from "@/lib/currency";
-import { calculateMemberBalances } from "@/lib/split-calculator";
+import { calculateMemberBalances, getCurrentUserBalance } from "@/lib/split-calculator";
 import {
   Users,
   UserCheck,
@@ -40,6 +40,7 @@ export function Sidebar() {
     pendingSyncCount,
     isOffline,
     syncNow,
+    userProfile,
   } = useSplitest();
 
   const [isGroupsOpen, setIsGroupsOpen] = useState(true);
@@ -57,10 +58,10 @@ export function Sidebar() {
         gExpenses,
         gSettlements,
       );
-      balanceMap[group.id] = balances["You"]?.netBalance || 0;
+      balanceMap[group.id] = getCurrentUserBalance(balances, group, userProfile)?.netBalance || 0;
     }
     return balanceMap;
-  }, [groups, allExpenses, allSettlements]);
+  }, [groups, allExpenses, allSettlements, userProfile]);
 
   const navLinks = [
     { id: "wallet", label: "Groups", icon: Users },

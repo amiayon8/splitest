@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useSplitest } from "@/lib/store";
 import { formatCurrency } from "@/lib/currency";
+import { getCurrentUserMemberName } from "@/lib/split-calculator";
 import { LocalTime } from "@/lib/timezone";
 import { Expense } from "@/types";
 import {
@@ -41,14 +42,25 @@ export function TransactionReceiptModal() {
     activeCurrency,
     showToast,
     currentView,
+    userProfile,
+    activeGroup,
+    groups,
   } = useSplitest();
 
   const [commentText, setCommentText] = useState("");
 
   if (!selectedExpenseId || !selectedExpense) return null;
 
-  const youPaid = selectedExpense.paidByName === "You";
-  const yourSplit = selectedExpense.splits.find((s) => s.memberName === "You");
+  const expenseGroup = groups.find((g) => g.id === selectedExpense.groupId) || activeGroup;
+  const currentMemberName = getCurrentUserMemberName(expenseGroup, userProfile);
+  const isSelf = (name: string) =>
+    name === currentMemberName ||
+    name === "You" ||
+    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
+    (Boolean(userProfile?.username) && name === userProfile.username);
+
+  const youPaid = isSelf(selectedExpense.paidByName);
+  const yourSplit = selectedExpense.splits.find((s) => isSelf(s.memberName));
   const yourShare = yourSplit ? yourSplit.shareAmount : 0;
   const yourNet = youPaid ? selectedExpense.amount - yourShare : -yourShare;
 
@@ -56,7 +68,7 @@ export function TransactionReceiptModal() {
     if (!commentText.trim()) return;
     const text = commentText.trim();
     setCommentText("");
-    await addComment(selectedExpense.id, text, "You");
+    await addComment(selectedExpense.id, text, currentMemberName);
   };
 
   const handleDelete = async () => {
@@ -123,7 +135,9 @@ export function TransactionReceiptModal() {
           <div className="flex justify-between text-xs">
             <span className="text-slate-500 dark:text-slate-400">Paid by</span>
             <span className="font-semibold text-slate-800 dark:text-slate-200">
-              {selectedExpense.paidByName}
+              {isSelf(selectedExpense.paidByName) && !selectedExpense.paidByName.includes("(You)")
+                ? `${selectedExpense.paidByName} (You)`
+                : selectedExpense.paidByName}
             </span>
           </div>
 
@@ -167,7 +181,9 @@ export function TransactionReceiptModal() {
                 className="p-2.5 rounded-2xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-slate-200/60 dark:border-slate-700 flex items-center justify-between text-xs"
               >
                 <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {s.memberName}
+                  {isSelf(s.memberName) && !s.memberName.includes("(You)")
+                    ? `${s.memberName} (You)`
+                    : s.memberName}
                 </span>
                 <span className="font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                   {formatCurrency(s.shareAmount, activeCurrency)}

@@ -5,7 +5,7 @@ import { useSplitest } from '@/lib/store';
 import { formatCurrency } from '@/lib/currency';
 import { LocalTime, formatMonthYear } from '@/lib/timezone';
 import { WalletCardDeck } from '@/components/WalletCardDeck';
-import { calculateMemberBalances } from '@/lib/split-calculator';
+import { calculateMemberBalances, getCurrentUserMemberName, getCurrentUserBalance } from '@/lib/split-calculator';
 import { Expense } from '@/types';
 import {
   Share2,
@@ -26,6 +26,7 @@ import {
 export function ExpenseFeed() {
   const {
     activeGroup,
+    userProfile,
     expenses,
     settlements,
     selectedExpenseId,
@@ -45,50 +46,59 @@ export function ExpenseFeed() {
     activeCurrency,
   } = useSplitest();
 
+  const currentMemberName = useMemo(
+    () => getCurrentUserMemberName(activeGroup, userProfile),
+    [activeGroup, userProfile]
+  );
+
+  const isSelf = useMemo(() => {
+    return (name: string) => name === currentMemberName || name === 'You';
+  }, [currentMemberName]);
+
   const memberNames = useMemo(() => activeGroup.members.map((m) => m.name), [activeGroup]);
 
   const memberBalances = useMemo(() => {
     return calculateMemberBalances(memberNames, expenses, settlements);
   }, [memberNames, expenses, settlements]);
 
-  const yourBalance = memberBalances['You']?.netBalance || 0;
+  const yourBalance = getCurrentUserBalance(memberBalances, activeGroup, userProfile)?.netBalance || 0;
 
   const totalYouOwe = useMemo(() => {
     let total = 0;
     for (const exp of expenses) {
-      if (exp.paidByName !== 'You') {
-        const yourSplit = exp.splits.find((s) => s.memberName === 'You');
+      if (!isSelf(exp.paidByName)) {
+        const yourSplit = exp.splits.find((s) => isSelf(s.memberName));
         if (yourSplit) {
           total += yourSplit.shareAmount;
         }
       }
     }
     for (const settle of settlements) {
-      if (settle.payerName === 'You') {
+      if (isSelf(settle.payerName)) {
         total -= settle.amount;
       }
     }
     return Math.max(0, Math.round(total * 100) / 100);
-  }, [expenses, settlements]);
+  }, [expenses, settlements, isSelf]);
 
   const totalYouAreOwed = useMemo(() => {
     let total = 0;
     for (const exp of expenses) {
-      if (exp.paidByName === 'You') {
+      if (isSelf(exp.paidByName)) {
         for (const split of exp.splits) {
-          if (split.memberName !== 'You') {
+          if (!isSelf(split.memberName)) {
             total += split.shareAmount;
           }
         }
       }
     }
     for (const settle of settlements) {
-      if (settle.recipientName === 'You') {
+      if (isSelf(settle.recipientName)) {
         total -= settle.amount;
       }
     }
     return Math.max(0, Math.round(total * 100) / 100);
-  }, [expenses, settlements]);
+  }, [expenses, settlements, isSelf]);
 
   const filteredExpenses = useMemo(() => {
     let list = [...expenses];
@@ -107,8 +117,8 @@ export function ExpenseFeed() {
       if (selectedCategory === 'mine') {
         list = list.filter(
           (exp) =>
-            exp.paidByName === 'You' ||
-            exp.splits.some((s) => s.memberName === 'You' && s.shareAmount > 0)
+            isSelf(exp.paidByName) ||
+            exp.splits.some((s) => isSelf(s.memberName) && s.shareAmount > 0)
         );
       } else {
         list = list.filter((exp) => exp.category === selectedCategory);
@@ -389,8 +399,8 @@ export function ExpenseFeed() {
                   {monthExpenses.map((expense) => {
                     const isSelected = selectedExpenseId === expense.id;
                     const IconComponent = getCategoryIcon(expense.category);
-                    const isPayerYou = expense.paidByName === 'You';
-                    const yourSplit = expense.splits.find((s) => s.memberName === 'You');
+                    const isPayerYou = isSelf(expense.paidByName);
+                    const yourSplit = expense.splits.find((s) => isSelf(s.memberName));
 
                     return (
                       <div

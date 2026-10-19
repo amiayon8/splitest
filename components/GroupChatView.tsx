@@ -4,6 +4,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useSplitest } from "@/lib/store";
 import { formatCurrency } from "@/lib/currency";
 import { LocalTime } from "@/lib/timezone";
+import { getCurrentUserMemberName } from "@/lib/split-calculator";
 import { ChatAttachment } from "@/types";
 import {
   Send,
@@ -71,9 +72,22 @@ export function GroupChatView() {
   const [isMobileInboxView, setIsMobileInboxView] = useState(false);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
 
+  const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
+  const isSelf = (name: string) =>
+    name === currentMemberName ||
+    name === "You" ||
+    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
+    (Boolean(userProfile?.username) && name === userProfile.username);
+
   const [customExpenseTitle, setCustomExpenseTitle] = useState("");
   const [customExpenseAmount, setCustomExpenseAmount] = useState("");
-  const [customExpensePayer, setCustomExpensePayer] = useState("You");
+  const [customExpensePayer, setCustomExpensePayer] = useState("");
+
+  useEffect(() => {
+    if (currentMemberName) {
+      setCustomExpensePayer(currentMemberName);
+    }
+  }, [currentMemberName]);
 
   const [borrowTargetMember, setBorrowTargetMember] = useState("");
   const [borrowAmount, setBorrowAmount] = useState("");
@@ -105,7 +119,7 @@ export function GroupChatView() {
 
     for (const group of groups) {
       for (const member of group.members) {
-        if (member.name !== "You" && !map.has(member.name)) {
+        if (!isSelf(member.name) && !map.has(member.name)) {
           const generatedUsername = member.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
           map.set(member.name, {
             name: member.name,
@@ -281,7 +295,7 @@ export function GroupChatView() {
         name: m.name,
         handle: m.name.toLowerCase().replace(/[^a-z0-9]/g, "."),
         avatarUrl: m.avatarUrl,
-        subtitle: m.name === "You" ? "You" : m.role || "Member",
+        subtitle: isSelf(m.name) ? `${m.role || "Member"} (You)` : m.role || "Member",
       })),
     ];
 
@@ -416,7 +430,7 @@ export function GroupChatView() {
     if (isNaN(amountNum) || amountNum <= 0) return;
     const recipient =
       borrowTargetMember ||
-      groupMembers.find((m) => m.name !== "You")?.name ||
+      groupMembers.find((m) => !isSelf(m.name))?.name ||
       "Group";
     setActiveAttachment({
       type: "borrow_request",
@@ -424,7 +438,7 @@ export function GroupChatView() {
       amount: amountNum,
       currencyCode: activeCurrency,
       recipientName: recipient,
-      payerName: "You",
+      payerName: currentMemberName,
     });
     setBorrowAmount("");
     setBorrowPurpose("");
@@ -762,7 +776,10 @@ export function GroupChatView() {
               const isMe = msg.senderIsCurrentUser;
               const hasLiked =
                 msg.likes &&
-                msg.likes.includes(userProfile.fullName || "You");
+                (msg.likes.includes(userProfile.fullName || "") ||
+                  msg.likes.includes(userProfile.username || "") ||
+                  msg.likes.includes(currentMemberName) ||
+                  msg.likes.includes("You"));
               const likesCount = msg.likes?.length || 0;
 
               return (
@@ -828,7 +845,7 @@ export function GroupChatView() {
                                     {msg.attachment.title}
                                   </div>
                                   <div className="text-[10px] opacity-80">
-                                    Paid by {msg.attachment.payerName || "You"}
+                                    Paid by {msg.attachment.payerName || currentMemberName}
                                   </div>
                                 </div>
                               </div>
@@ -891,7 +908,7 @@ export function GroupChatView() {
                                     if (msg.attachment) {
                                       setSettlePrefill({
                                         recipient:
-                                          msg.attachment.recipientName || "You",
+                                          msg.attachment.recipientName || currentMemberName,
                                         amount: msg.attachment.amount,
                                       });
                                       setIsSettleModalOpen(true);
@@ -991,7 +1008,7 @@ export function GroupChatView() {
                         </span>
                       </div>
                     </div>
-                    {member.name !== "You" && (
+                    {!isSelf(member.name) && (
                       <button
                         type="button"
                         onClick={() => handleInsertMention(member.name)}
@@ -1502,7 +1519,7 @@ export function GroupChatView() {
                     >
                       {groupMembers.map((m) => (
                         <option key={m.id} value={m.name}>
-                          Paid by {m.name}
+                          Paid by {m.name}{isSelf(m.name) && !m.name.includes("(You)") ? " (You)" : ""}
                         </option>
                       ))}
                     </select>
@@ -1529,7 +1546,7 @@ export function GroupChatView() {
                     className="w-full h-9 px-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 outline-none"
                   >
                     {groupMembers
-                      .filter((m) => m.name !== "You")
+                      .filter((m) => !isSelf(m.name))
                       .map((m) => (
                         <option key={m.id} value={m.name}>
                           {m.name}

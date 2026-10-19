@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { useSplitest } from '@/lib/store';
 import { WalletCardDeck } from '@/components/WalletCardDeck';
 import { formatCurrency } from '@/lib/currency';
+import { getCurrentUserMemberName } from '@/lib/split-calculator';
 import { LocalTime } from '@/lib/timezone';
 import { Expense } from '@/types';
 import {
@@ -30,7 +31,16 @@ export function WalletDashboard() {
     exportGroupCsv,
     isViewOnly,
     activeCurrency,
+    activeGroup,
+    userProfile,
   } = useSplitest();
+
+  const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
+  const isSelf = (name: string) =>
+    name === currentMemberName ||
+    name === 'You' ||
+    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
+    (Boolean(userProfile?.username) && name === userProfile.username);
 
   const recentExpenses = useMemo(() => {
     return [...expenses]
@@ -117,8 +127,8 @@ export function WalletDashboard() {
           <div className="bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-200/80 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 shadow-2xs overflow-hidden">
             {recentExpenses.map((expense) => {
               const IconComponent = getCategoryIcon(expense.category);
-              const isPayerYou = expense.paidByName === 'You';
-              const yourSplit = expense.splits.find((s) => s.memberName === 'You');
+              const isPayerYou = isSelf(expense.paidByName);
+              const yourSplit = expense.splits.find((s) => isSelf(s.memberName));
 
               return (
                 <div

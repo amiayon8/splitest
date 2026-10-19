@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { useSplitest } from '@/lib/store';
 import { formatCurrency } from '@/lib/currency';
+import { getCurrentUserMemberName } from '@/lib/split-calculator';
 import { LocalTime, formatMonthYear } from '@/lib/timezone';
 import { Expense } from '@/types';
 import {
@@ -32,7 +33,15 @@ export function AllExpensesView() {
     setIsAddExpenseModalOpen,
     isViewOnly,
     activeCurrency,
+    userProfile,
   } = useSplitest();
+
+  const currentMemberName = getCurrentUserMemberName(activeGroup, userProfile);
+  const isSelf = (name: string) =>
+    name === currentMemberName ||
+    name === 'You' ||
+    (Boolean(userProfile?.fullName) && name === userProfile.fullName) ||
+    (Boolean(userProfile?.username) && name === userProfile.username);
 
   const filteredExpenses = useMemo(() => {
     let list = [...expenses];
@@ -51,8 +60,8 @@ export function AllExpensesView() {
       if (selectedCategory === 'mine') {
         list = list.filter(
           (exp) =>
-            exp.paidByName === 'You' ||
-            exp.splits.some((s) => s.memberName === 'You' && s.shareAmount > 0)
+            isSelf(exp.paidByName) ||
+            exp.splits.some((s) => isSelf(s.memberName) && s.shareAmount > 0)
         );
       } else {
         list = list.filter((exp) => exp.category === selectedCategory);
@@ -68,7 +77,7 @@ export function AllExpensesView() {
     }
 
     return list;
-  }, [expenses, searchQuery, selectedCategory, sortOrder]);
+  }, [expenses, searchQuery, selectedCategory, sortOrder, currentMemberName, userProfile]);
 
   const groupedByMonth = useMemo(() => {
     const groupsMap: Record<string, Expense[]> = {};
@@ -200,8 +209,8 @@ export function AllExpensesView() {
               <div className="bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 shadow-2xs">
                 {monthExpenses.map((expense) => {
                   const IconComponent = getCategoryIcon(expense.category);
-                  const isPayerYou = expense.paidByName === 'You';
-                  const yourSplit = expense.splits.find((s) => s.memberName === 'You');
+                  const isPayerYou = isSelf(expense.paidByName);
+                  const yourSplit = expense.splits.find((s) => isSelf(s.memberName));
 
                   return (
                     <div
