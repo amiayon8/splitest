@@ -157,6 +157,71 @@ export function GroupChatView() {
     return Array.from(map.values());
   }, [groups, allFriendsList]);
 
+  const memberLookupMap = useMemo(() => {
+    const map = new Map<string, { name: string; username?: string; avatarUrl?: string }>();
+
+    if (userProfile.fullName) {
+      map.set(userProfile.fullName.trim().toLowerCase(), {
+        name: userProfile.fullName,
+        username: userProfile.username,
+        avatarUrl: userProfile.avatarUrl,
+      });
+    }
+    if (userProfile.username) {
+      map.set(userProfile.username.trim().toLowerCase(), {
+        name: userProfile.fullName || userProfile.username,
+        username: userProfile.username,
+        avatarUrl: userProfile.avatarUrl,
+      });
+    }
+    if (userProfile.paymentHandle) {
+      map.set(userProfile.paymentHandle.trim().toLowerCase(), {
+        name: userProfile.fullName || userProfile.username || "User",
+        username: userProfile.username,
+        avatarUrl: userProfile.avatarUrl,
+      });
+    }
+
+    for (const group of groups) {
+      for (const member of group.members) {
+        const key = member.name.trim().toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, {
+            name: member.name,
+            avatarUrl: member.avatarUrl,
+          });
+        }
+      }
+    }
+
+    for (const friend of allFriendsList) {
+      const nameKey = friend.name.trim().toLowerCase();
+      const existing = map.get(nameKey);
+      if (existing) {
+        if (!existing.avatarUrl && friend.avatarUrl) existing.avatarUrl = friend.avatarUrl;
+        if (!existing.username && friend.username) existing.username = friend.username;
+      } else {
+        map.set(nameKey, {
+          name: friend.name,
+          username: friend.username,
+          avatarUrl: friend.avatarUrl,
+        });
+      }
+      if (friend.username) {
+        const usernameKey = friend.username.trim().toLowerCase();
+        if (!map.has(usernameKey)) {
+          map.set(usernameKey, {
+            name: friend.name,
+            username: friend.username,
+            avatarUrl: friend.avatarUrl,
+          });
+        }
+      }
+    }
+
+    return map;
+  }, [userProfile, groups, allFriendsList]);
+
   const filteredFriendsList = useMemo(() => {
     const query = friendSearchQuery.trim().toLowerCase().replace(/^[#@]+/, '');
     if (!query) return allAvailableFriends;
@@ -846,7 +911,50 @@ export function GroupChatView() {
             </div>
 
             {chatMessages.map((msg, index) => {
-              const isMe = msg.senderIsCurrentUser;
+              const isSystem = msg.senderName === "System";
+              if (isSystem) {
+                return (
+                  <div key={msg.id || index} className="flex justify-center my-3">
+                    <div className="px-3 py-1 rounded-full bg-slate-100 dark:bg-neutral-800 text-[11px] font-medium text-slate-500 dark:text-slate-400 select-none">
+                      {msg.content}
+                    </div>
+                  </div>
+                );
+              }
+
+              const isMe = isSelf(msg.senderName);
+              const cleanSender = (msg.senderName || "").trim().toLowerCase();
+              const senderInfo = memberLookupMap.get(cleanSender);
+              const senderDisplayName = isMe
+                ? userProfile.fullName || userProfile.username || "You"
+                : senderInfo?.name || msg.senderName || "User";
+              const senderHandle = senderInfo?.username ? senderInfo.username.replace(/^@/, "") : "";
+              const senderAvatar = isMe
+                ? userProfile.avatarUrl || msg.senderAvatarUrl || ""
+                : msg.senderAvatarUrl || senderInfo?.avatarUrl || "";
+
+              const prevMsg = chatMessages[index - 1];
+              const nextMsg = chatMessages[index + 1];
+
+              const isSameSenderAsPrev = Boolean(
+                prevMsg &&
+                prevMsg.senderName &&
+                prevMsg.senderName !== "System" &&
+                (isSelf(prevMsg.senderName) === isMe) &&
+                (isMe || prevMsg.senderName.trim().toLowerCase() === cleanSender)
+              );
+
+              const isSameSenderAsNext = Boolean(
+                nextMsg &&
+                nextMsg.senderName &&
+                nextMsg.senderName !== "System" &&
+                (isSelf(nextMsg.senderName) === isMe) &&
+                (isMe || nextMsg.senderName.trim().toLowerCase() === cleanSender)
+              );
+
+              const isFirstInSequence = !isSameSenderAsPrev;
+              const isLastInSequence = !isSameSenderAsNext;
+
               const hasLiked =
                 msg.likes &&
                 (msg.likes.includes(userProfile.fullName || "") ||
@@ -860,20 +968,26 @@ export function GroupChatView() {
                   key={msg.id || index}
                   className={`flex items-end gap-2 max-w-[85%] sm:max-w-[70%] group ${
                     isMe ? "ml-auto flex-row-reverse" : "mr-auto"
-                  }`}
+                  } ${isFirstInSequence ? "mt-3" : "mt-1"}`}
                 >
                   {!isMe && (
-                    <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-neutral-700 overflow-hidden shrink-0 mb-1 border border-slate-200 dark:border-neutral-700">
-                      {msg.senderAvatarUrl ? (
-                        <img
-                          src={msg.senderAvatarUrl}
-                          alt={msg.senderName}
-                          className="w-full h-full object-cover"
-                        />
+                    <div className="w-8 shrink-0 flex flex-col items-center justify-end self-end mb-1">
+                      {isLastInSequence ? (
+                        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-slate-200/80 dark:border-neutral-700/80 shadow-2xs bg-gradient-to-tr from-slate-200 to-slate-300 dark:from-neutral-800 dark:to-neutral-700 flex items-center justify-center">
+                          {senderAvatar ? (
+                            <img
+                              src={senderAvatar}
+                              alt={senderDisplayName}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                              {senderDisplayName.slice(0, 1).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
                       ) : (
-                        <span className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                          {msg.senderName.slice(0, 1)}
-                        </span>
+                        <div className="w-8 h-8" />
                       )}
                     </div>
                   )}
@@ -883,18 +997,25 @@ export function GroupChatView() {
                       isMe ? "items-end" : "items-start"
                     }`}
                   >
-                    {!isMe && (
-                      <span className="text-[10px] text-slate-400 dark:text-slate-400 mb-1 px-1 font-medium">
-                        {msg.senderName}
-                      </span>
+                    {!isMe && isFirstInSequence && (
+                      <div className="flex items-center gap-1.5 mb-1 px-1">
+                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          {senderDisplayName}
+                        </span>
+                        {senderHandle && senderHandle.toLowerCase() !== senderDisplayName.toLowerCase() && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            @{senderHandle}
+                          </span>
+                        )}
+                      </div>
                     )}
 
                     <div
                       onDoubleClick={() => toggleChatMessageLike(msg.id)}
                       className={`relative px-4 py-2.5 transition-all text-sm select-text ${
                         isMe
-                          ? "bg-[#059669] text-white rounded-[20px] rounded-br-sm"
-                          : "bg-[#EFEFEF] dark:bg-[#262626] text-slate-900 dark:text-slate-100 rounded-[20px] rounded-bl-sm"
+                          ? "bg-[#059669] text-white rounded-[20px] rounded-br-xs"
+                          : "bg-[#EFEFEF] dark:bg-[#262626] text-slate-900 dark:text-slate-100 rounded-[20px] rounded-bl-xs"
                       }`}
                     >
                       {msg.content && renderMessageContent(msg.content)}

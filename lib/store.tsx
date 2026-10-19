@@ -976,11 +976,17 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const builtChatMessages: GroupChatMessage[] = (chatRes.data || [])
         .filter((c) => c.group_id !== 'group-bali-retreat')
         .map((c) => {
+          const rawSender = (c.sender_name || '').trim().toLowerCase();
+          const currentFullName = (effectiveProfile.fullName || '').trim().toLowerCase();
+          const currentUsername = (effectiveProfile.username || '').trim().toLowerCase();
+          const currentHandle = (effectiveProfile.paymentHandle || '').trim().toLowerCase();
+
           const isSenderCurrent =
-            c.sender_name === effectiveProfile.fullName ||
-            c.sender_name === effectiveProfile.username ||
-            c.sender_name === 'You' ||
-            c.sender_is_current_user;
+            rawSender === 'you' ||
+            (currentFullName !== '' && rawSender === currentFullName) ||
+            (currentUsername !== '' && rawSender === currentUsername) ||
+            (currentHandle !== '' && rawSender === currentHandle);
+
           return {
             id: c.id,
             groupId: c.group_id,
@@ -2206,7 +2212,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             group_id: newMessage.groupId,
             sender_name: newMessage.senderName,
             sender_avatar_url: newMessage.senderAvatarUrl,
-            sender_is_current_user: newMessage.senderIsCurrentUser,
+            sender_is_current_user: false,
             content: newMessage.content,
             mentions: newMessage.mentions,
             attachment: newMessage.attachment || null,
