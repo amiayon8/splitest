@@ -38,16 +38,16 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
     if (!isOpen || !activeGroup?.id) return;
     const client = getSupabaseClient();
     if (client) {
-      void client
-        .from("group_invites")
-        .upsert({
-          id: linkToken,
-          group_id: activeGroup.id,
-          role: generalAccessRole,
-          created_by: userProfile.id || null,
-        })
-        .then(() => {})
-        .catch(() => {});
+      Promise.resolve(
+        client
+          .from("group_invites")
+          .upsert({
+            id: linkToken,
+            group_id: activeGroup.id,
+            role: generalAccessRole,
+            created_by: userProfile.id || null,
+          })
+      ).catch(() => {});
     }
   }, [isOpen, activeGroup?.id, linkToken, generalAccessRole, userProfile.id]);
 
