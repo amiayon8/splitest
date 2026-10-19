@@ -9,6 +9,7 @@ import {
   Users,
   UserCheck,
   User,
+  ArrowLeftRight,
   MessageSquare,
   Bell,
   LogOut,
@@ -309,10 +310,22 @@ export function Header() {
                       setCurrentView("chat");
                       setIsProfileDropdownOpen(false);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:white transition-colors text-left"
                   >
                     <MessageSquare className="w-4 h-4 text-slate-400 dark:text-slate-400" />
                     <span>Group Chat</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentView("debts");
+                      setIsProfileDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:white transition-colors text-left"
+                  >
+                    <ArrowLeftRight className="w-4 h-4 text-[#059669] dark:text-[#10B981]" />
+                    <span>Debt Flow</span>
                   </button>
 
                   <button

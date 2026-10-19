@@ -36,8 +36,8 @@ interface SplitestContextType {
   activeGroupId: string;
   activeGroup: Group;
   setActiveGroupId: (id: string) => void;
-  currentView: 'wallet' | 'expenses' | 'groups' | 'analytics' | 'profile' | 'chat';
-  setCurrentView: (view: 'wallet' | 'expenses' | 'groups' | 'analytics' | 'profile' | 'chat') => void;
+  currentView: 'wallet' | 'expenses' | 'groups' | 'debts' | 'analytics' | 'profile' | 'chat';
+  setCurrentView: (view: 'wallet' | 'expenses' | 'groups' | 'debts' | 'analytics' | 'profile' | 'chat') => void;
   expenses: Expense[];
   allExpenses: Expense[];
   settlements: Settlement[];
@@ -214,7 +214,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [activeGroupId, setActiveGroupId] = useState<string>('');
-  const [currentView, setCurrentView] = useState<'wallet' | 'expenses' | 'groups' | 'analytics' | 'profile' | 'chat'>('wallet');
+  const [currentView, setCurrentView] = useState<'wallet' | 'expenses' | 'groups' | 'debts' | 'analytics' | 'profile' | 'chat'>('wallet');
 
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     if (typeof window === 'undefined') return initialProfile;

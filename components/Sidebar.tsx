@@ -10,6 +10,7 @@ import {
 import {
   Users,
   UserCheck,
+  ArrowLeftRight,
   Receipt,
   MessageSquare,
   PieChart,
@@ -70,6 +71,7 @@ export function Sidebar() {
   const navLinks = [
     { id: "wallet", label: "Groups", icon: Users },
     { id: "groups", label: "Friends", icon: UserCheck },
+    { id: "debts", label: "Debt Flow", icon: ArrowLeftRight },
     { id: "expenses", label: "Activity", icon: Receipt },
     { id: "chat", label: "Chat", icon: MessageSquare },
     { id: "analytics", label: "Insights", icon: PieChart },

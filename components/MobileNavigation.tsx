@@ -2,17 +2,11 @@
 
 import React from 'react';
 import { useSplitest } from '@/lib/store';
-import { Users, MessageSquare, Receipt, User, Plus } from 'lucide-react';
+import { Users, MessageSquare, ArrowLeftRight, User, Plus } from 'lucide-react';
 
 export function MobileNavigation() {
   const { currentView, setCurrentView, setIsAddExpenseModalOpen, isViewOnly } = useSplitest();
 
-  const navItems = [
-    { id: 'wallet', label: 'Groups', icon: Users },
-    { id: 'chat', label: 'Chat', icon: MessageSquare },
-    { id: 'expenses', label: 'Activity', icon: Receipt },
-    { id: 'profile', label: 'Profile', icon: User },
-  ] as const;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 grid grid-cols-5 items-center px-1 z-40 md:hidden select-none pb-safe transition-colors duration-150">
@@ -71,21 +65,21 @@ export function MobileNavigation() {
 
       <button
         type="button"
-        onClick={() => setCurrentView('expenses')}
+        onClick={() => setCurrentView('debts')}
         className={`flex flex-col items-center justify-center py-1 transition-all ${
-          currentView === 'expenses'
+          currentView === 'debts'
             ? 'text-[#059669] dark:text-[#10B981] font-bold'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
         }`}
       >
         <div
           className={`px-3 py-1 rounded-full transition-all ${
-            currentView === 'expenses' ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70' : 'bg-transparent'
+            currentView === 'debts' ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70' : 'bg-transparent'
           }`}
         >
-          <Receipt className="w-5 h-5" />
+          <ArrowLeftRight className="w-5 h-5" />
         </div>
-        <span className="text-[10px] leading-tight mt-0.5">Activity</span>
+        <span className="text-[10px] leading-tight mt-0.5">Flow</span>
       </button>
 
       <button

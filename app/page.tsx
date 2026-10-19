@@ -11,6 +11,7 @@ import { GroupsView } from "@/components/GroupsView";
 import { AnalyticsView } from "@/components/AnalyticsView";
 import { ProfileView } from "@/components/ProfileView";
 import { GroupChatView } from "@/components/GroupChatView";
+import { DebtFlowView } from "@/components/DebtFlowView";
 import { TransactionReceiptModal } from "@/components/TransactionReceiptModal";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { EditExpenseModal } from "@/components/EditExpenseModal";
@@ -45,6 +46,7 @@ export default function HomePage() {
           {currentView === "wallet" && <ExpenseFeed />}
           {currentView === "expenses" && <AllExpensesView />}
           {currentView === "groups" && <GroupsView />}
+          {currentView === "debts" && <DebtFlowView />}
           {currentView === "chat" && <GroupChatView />}
           {currentView === "analytics" && <AnalyticsView />}
           {currentView === "profile" && <ProfileView />}
