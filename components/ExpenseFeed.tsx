@@ -157,29 +157,50 @@ export function ExpenseFeed() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC] dark:bg-[#090D16] select-none transition-colors duration-150">
-      <div className="bg-white dark:bg-[#0F172A] border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 py-4 sticky top-16 z-30 transition-colors">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                {activeGroup.name}
-              </h1>
-              {isViewOnly ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
-                  <Shield className="w-3 h-3" />
-                  View Only
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#D1FAE5] dark:bg-[#064E3B]/70 text-[#065F46] dark:text-[#A7F3D0] border border-[#A7F3D0] dark:border-[#059669]">
-                  {activeGroup.userRole === 'owner' ? 'Owner' : 'Editor'}
-                </span>
+      <div className="bg-white dark:bg-[#0F172A] border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 py-3.5 sm:py-4 sticky top-16 z-30 transition-colors">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate max-w-[220px] sm:max-w-none">
+                  {activeGroup.name}
+                </h1>
+                {isViewOnly ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1 shrink-0">
+                    <Shield className="w-3 h-3" />
+                    View Only
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-[#D1FAE5] dark:bg-[#064E3B]/70 text-[#065F46] dark:text-[#A7F3D0] border border-[#A7F3D0] dark:border-[#059669] shrink-0">
+                    {activeGroup.userRole === 'owner' ? 'Owner' : 'Editor'}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[260px] sm:max-w-none">
+                {activeGroup.description || 'Shared Expense Ledger'}
+              </p>
+            </div>
+
+            <div className="flex -space-x-2 overflow-hidden items-center sm:hidden shrink-0">
+              {activeGroup.members.slice(0, 4).map((member) => (
+                <img
+                  key={member.id}
+                  src={member.avatarUrl}
+                  alt={member.name}
+                  title={member.name}
+                  className="w-7 h-7 rounded-full border-2 border-white dark:border-[#0F172A] object-cover shadow-2xs"
+                />
+              ))}
+              {activeGroup.members.length > 4 && (
+                <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-[#0F172A] flex items-center justify-center text-[9px] font-bold text-slate-600 dark:text-slate-300 shadow-2xs">
+                  +{activeGroup.members.length - 4}
+                </div>
               )}
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{activeGroup.description || 'Shared Expense Ledger'}</p>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <div className="flex -space-x-2 overflow-hidden items-center mr-1">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden sm:flex -space-x-2 overflow-hidden items-center mr-1">
               {activeGroup.members.slice(0, 5).map((member) => (
                 <img
                   key={member.id}
@@ -199,7 +220,7 @@ export function ExpenseFeed() {
             <button
               type="button"
               onClick={() => setIsLedgerSettingsModalOpen(true)}
-              className="h-10 px-3.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="h-9 sm:h-10 px-3 sm:px-3.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
               title="Ledger Settings"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -209,7 +230,7 @@ export function ExpenseFeed() {
             <button
               type="button"
               onClick={() => setIsShareModalOpen(true)}
-              className="h-10 px-3.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="h-9 sm:h-10 px-3 sm:px-3.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span>Share</span>
@@ -220,7 +241,7 @@ export function ExpenseFeed() {
                 <button
                   type="button"
                   onClick={() => setIsSettleModalOpen(true)}
-                  className="h-10 px-4 rounded-full bg-white dark:bg-[#1E293B] border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
+                  className="h-9 sm:h-10 px-3.5 sm:px-4 rounded-full bg-white dark:bg-[#1E293B] border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors ml-auto sm:ml-0"
                 >
                   <Handshake className="w-4 h-4 text-[#059669] dark:text-[#10B981]" />
                   <span>Settle Up</span>
@@ -229,7 +250,7 @@ export function ExpenseFeed() {
                 <button
                   type="button"
                   onClick={() => setIsAddExpenseModalOpen(true)}
-                  className="h-10 px-4 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm active:scale-98 transition-all"
+                  className="hidden sm:flex h-10 px-4 rounded-full bg-[#059669] hover:bg-[#047857] text-white text-xs font-semibold items-center gap-1.5 shadow-sm active:scale-98 transition-all"
                 >
                   <Plus className="w-4 h-4 stroke-[2.5]" />
                   <span>Add Expense</span>

@@ -103,7 +103,7 @@ export function InspectorPane() {
   }, [categoryBreakdown, circumference]);
 
   return (
-    <aside className="w-85 shrink-0 bg-white dark:bg-[#0F172A] border-l border-slate-200/80 dark:border-slate-800 p-5 flex flex-col gap-4 overflow-y-auto thin-scrollbar xl:flex select-none">
+    <aside className="hidden xl:flex w-85 shrink-0 bg-white dark:bg-[#0F172A] border-l border-slate-200/80 dark:border-slate-800 p-5 flex-col gap-4 overflow-y-auto thin-scrollbar select-none">
       <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-2xl bg-[#D1FAE5] dark:bg-[#064E3B]/60 text-[#065F46] dark:text-[#A7F3D0] flex items-center justify-center font-bold text-xs shrink-0">

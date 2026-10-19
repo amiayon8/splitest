@@ -32,7 +32,11 @@ export default function HomePage() {
       <OfflineBanner />
       <Header />
 
-      <div className="flex-1 flex w-full pt-16 pb-20 md:pb-0">
+      <div
+        className={`flex-1 flex w-full pt-16 ${
+          currentView === "chat" ? "pb-0" : "pb-24 md:pb-0"
+        }`}
+      >
         <div className="hidden md:block shrink-0">
           <Sidebar />
         </div>

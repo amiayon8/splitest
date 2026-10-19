@@ -62,13 +62,14 @@ export function ShareProfileModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-fade-in"
       onClick={() => setIsShareProfileModalOpen(false)}
     >
       <div
-        className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 overflow-hidden"
+        className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-2 mb-3 sm:hidden shrink-0" />
         <div className="absolute top-0 left-0 right-0 h-2 bg-linear-to-r from-primary via-emerald-400 to-teal-500" />
 
         <div className="flex items-center justify-between mb-5">

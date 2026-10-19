@@ -38,8 +38,9 @@ export function CreateGroupModal() {
   if (!isNewGroupModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 select-none">
-      <div className="bg-white dark:bg-[#0F172A] w-full max-w-md rounded-3xl shadow-xl p-6 flex flex-col gap-5 border border-slate-200/80 dark:border-slate-800 max-h-[90vh] overflow-y-auto thin-scrollbar">
+    <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 select-none">
+      <div className="bg-white dark:bg-[#0F172A] w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-xl p-6 flex flex-col gap-5 border border-slate-200/80 dark:border-slate-800 max-h-[90vh] overflow-y-auto thin-scrollbar">
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-2 mb-1 sm:hidden shrink-0" />
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#D1FAE5] dark:bg-[#064E3B]/50 text-[#065F46] dark:text-[#A7F3D0] flex items-center justify-center">

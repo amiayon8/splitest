@@ -67,9 +67,10 @@ export function ShareGroupModal({ isOpen, onClose }: ShareGroupModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/70 backdrop-blur-xs select-none">
-      <div className="bg-white dark:bg-[#0F172A] w-full max-w-lg rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 dark:bg-black/70 backdrop-blur-xs select-none">
+      <div className="bg-white dark:bg-[#0F172A] w-full max-w-lg rounded-t-3xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden shrink-0" />
+        <div className="flex items-center justify-between px-6 pt-3 sm:pt-6 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
               Share &quot;{activeGroup.name}&quot;

@@ -559,7 +559,7 @@ export function GroupChatView() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full max-w-7xl mx-auto bg-white dark:bg-[#000000] border-x border-slate-200/80 dark:border-neutral-800 transition-colors select-none">
+    <div className="flex h-[calc(100dvh-8rem)] md:h-[calc(100vh-4rem)] w-full max-w-7xl mx-auto bg-white dark:bg-[#000000] border-x border-slate-200/80 dark:border-neutral-800 transition-colors select-none">
       <aside
         className={`${
           isMobileInboxView ? "flex" : "hidden md:flex"

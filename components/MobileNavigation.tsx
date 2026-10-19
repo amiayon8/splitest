@@ -15,71 +15,97 @@ export function MobileNavigation() {
   ] as const;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between px-4 z-40 md:hidden select-none pb-safe transition-colors duration-150">
-      <div className="flex items-center gap-1">
-        {navItems.slice(0, 2).map((item) => {
-          const isActive = currentView === item.id;
-          const IconComponent = item.icon;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setCurrentView(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-full transition-all ${
-                isActive ? 'text-[#059669] dark:text-[#10B981] font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
-              }`}
-            >
-              <div
-                className={`px-3 py-1 rounded-full transition-all ${
-                  isActive ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70' : 'bg-transparent'
-                }`}
-              >
-                <IconComponent className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] leading-tight mt-0.5">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
+    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 grid grid-cols-5 items-center px-1 z-40 md:hidden select-none pb-safe transition-colors duration-150">
+      <button
+        type="button"
+        onClick={() => setCurrentView('wallet')}
+        className={`flex flex-col items-center justify-center py-1 transition-all ${
+          currentView === 'wallet'
+            ? 'text-[#059669] dark:text-[#10B981] font-bold'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
+        }`}
+      >
+        <div
+          className={`px-3 py-1 rounded-full transition-all ${
+            currentView === 'wallet' ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70' : 'bg-transparent'
+          }`}
+        >
+          <Users className="w-5 h-5" />
+        </div>
+        <span className="text-[10px] leading-tight mt-0.5">Groups</span>
+      </button>
 
-      {!isViewOnly && (
-        <div className="relative -top-3">
+      <button
+        type="button"
+        onClick={() => setCurrentView('chat')}
+        className={`flex flex-col items-center justify-center py-1 transition-all ${
+          currentView === 'chat'
+            ? 'text-[#059669] dark:text-[#10B981] font-bold'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
+        }`}
+      >
+        <div
+          className={`px-3 py-1 rounded-full transition-all ${
+            currentView === 'chat' ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70' : 'bg-transparent'
+          }`}
+        >
+          <MessageSquare className="w-5 h-5" />
+        </div>
+        <span className="text-[10px] leading-tight mt-0.5">Chat</span>
+      </button>
+
+      <div className="flex items-center justify-center">
+        {!isViewOnly ? (
           <button
             type="button"
             onClick={() => setIsAddExpenseModalOpen(true)}
-            className="w-12 h-12 rounded-2xl bg-[#059669] hover:bg-[#047857] text-white flex items-center justify-center shadow-md active:scale-95 transition-all"
+            className="w-11 h-11 -mt-3 rounded-2xl bg-[#059669] hover:bg-[#047857] text-white flex items-center justify-center shadow-md active:scale-95 transition-all"
             aria-label="Add Expense"
           >
             <Plus className="w-6 h-6 stroke-[2.5]" />
           </button>
-        </div>
-      )}
-
-      <div className="flex items-center gap-1">
-        {navItems.slice(2).map((item) => {
-          const isActive = currentView === item.id;
-          const IconComponent = item.icon;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setCurrentView(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-full transition-all ${
-                isActive ? 'text-[#059669] dark:text-[#10B981] font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
-              }`}
-            >
-              <div
-                className={`px-3 py-1 rounded-full transition-all ${
-                  isActive ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70' : 'bg-transparent'
-                }`}
-              >
-                <IconComponent className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] leading-tight mt-0.5">{item.label}</span>
-            </button>
-          );
-        })}
+        ) : (
+          <div className="w-11 h-11 -mt-3" />
+        )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => setCurrentView('expenses')}
+        className={`flex flex-col items-center justify-center py-1 transition-all ${
+          currentView === 'expenses'
+            ? 'text-[#059669] dark:text-[#10B981] font-bold'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
+        }`}
+      >
+        <div
+          className={`px-3 py-1 rounded-full transition-all ${
+            currentView === 'expenses' ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70' : 'bg-transparent'
+          }`}
+        >
+          <Receipt className="w-5 h-5" />
+        </div>
+        <span className="text-[10px] leading-tight mt-0.5">Activity</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setCurrentView('profile')}
+        className={`flex flex-col items-center justify-center py-1 transition-all ${
+          currentView === 'profile'
+            ? 'text-[#059669] dark:text-[#10B981] font-bold'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
+        }`}
+      >
+        <div
+          className={`px-3 py-1 rounded-full transition-all ${
+            currentView === 'profile' ? 'bg-[#D1FAE5] dark:bg-[#064E3B]/70' : 'bg-transparent'
+          }`}
+        >
+          <User className="w-5 h-5" />
+        </div>
+        <span className="text-[10px] leading-tight mt-0.5">Profile</span>
+      </button>
     </nav>
   );
 }

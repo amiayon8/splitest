@@ -51,14 +51,14 @@ export function Header() {
           <button
             type="button"
             onClick={() => setCurrentView("wallet")}
-            className="hidden md:flex items-center gap-2.5 text-left focus:outline-none"
+            className="flex items-center gap-2.5 text-left focus:outline-none shrink-0"
           >
             <img
               src="/Splitest.svg"
               alt="Splitest"
-              className="w-10 h-10 object-contain shadow-xs"
+              className="w-8 h-8 md:w-10 md:h-10 object-contain shadow-xs"
             />
-            <div className="flex flex-col">
+            <div className="hidden lg:flex flex-col">
               <span className="text-[17px] text-slate-900 dark:text-slate-100 font-bold tracking-tight leading-none">
                 Splitest
               </span>
