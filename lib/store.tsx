@@ -141,7 +141,7 @@ interface SplitestContextType {
   sendTestNotification: () => Promise<boolean>;
   chatMessages: GroupChatMessage[];
   allChatMessages: GroupChatMessage[];
-  sendChatMessage: (data: { groupId: string; content: string; mentions?: string[]; attachment?: ChatAttachment }) => void;
+  sendChatMessage: (data: { groupId: string; content: string; mentions?: string[]; attachment?: ChatAttachment; senderName?: string }) => void;
   createGroupFromChat: (name: string, category: string, memberNames: string[]) => string;
   startDirectChat: (friend: { name: string; username?: string; email?: string; avatarUrl?: string }) => string;
   addMembersToGroup: (groupId: string, newMemberNames: string[]) => void;
@@ -2207,15 +2207,18 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       content: string;
       mentions?: string[];
       attachment?: ChatAttachment;
+      senderName?: string;
     }) => {
       const nowIso = new Date().toISOString();
       const currentUserName = userProfile.fullName || userProfile.username || 'User';
+      const senderName = data.senderName || currentUserName;
+      const isSystem = senderName === 'System';
       const newMessage: GroupChatMessage = {
         id: `chat-${Date.now()}`,
         groupId: data.groupId,
-        senderName: currentUserName,
-        senderAvatarUrl: userProfile.avatarUrl,
-        senderIsCurrentUser: true,
+        senderName,
+        senderAvatarUrl: isSystem ? '' : userProfile.avatarUrl,
+        senderIsCurrentUser: isSystem ? false : true,
         content: data.content,
         mentions: data.mentions || [],
         attachment: data.attachment,
@@ -2499,6 +2502,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       void sendChatMessage({
         groupId,
         content: `Added ${toAdd.join(', ')} to the chat`,
+        senderName: 'System',
       });
 
       const client = getSupabaseClient();
@@ -2613,6 +2617,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       void sendChatMessage({
         groupId,
         content: `Added ${memberName} (${cleanEmail}) to the group`,
+        senderName: 'System',
       });
 
       showToast(`Added ${memberName} (${cleanEmail}) to ${group.name}`);

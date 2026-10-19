@@ -5,7 +5,7 @@ import { useSplitest } from "@/lib/store";
 import { formatCurrency } from "@/lib/currency";
 import { LocalTime } from "@/lib/timezone";
 import { getCurrentUserMemberName, isMemberCurrentUser } from "@/lib/split-calculator";
-import { ChatAttachment } from "@/types";
+import { GroupChatMessage, ChatAttachment } from "@/types";
 import {
   Send,
   AtSign,
@@ -28,7 +28,16 @@ import {
   Info,
 } from "lucide-react";
 
-
+function isSystemNotificationMessage(msg?: GroupChatMessage | null): boolean {
+  if (!msg) return false;
+  if (msg.senderName === "System") return true;
+  const content = (msg.content || "").trim();
+  if (!content) return false;
+  if (/^(added|removed) .+ (to|from) the (group|chat)[\.!]?$/i.test(content)) return true;
+  if (/^.+ (joined|left) the (group|chat)[\.!]?$/i.test(content)) return true;
+  if (/^created the group[\.!]?/i.test(content)) return true;
+  return false;
+}
 
 export function GroupChatView() {
   const {
@@ -249,8 +258,11 @@ export function GroupChatView() {
       const msgs = allChatMessages.filter((m) => m.groupId === g.id);
       if (msgs.length > 0) {
         const last = msgs[msgs.length - 1];
+        const isSys = isSystemNotificationMessage(last);
         const snippet = last.attachment
           ? `${last.senderName}: Shared ${last.attachment.title}`
+          : isSys
+          ? last.content
           : `${last.senderName}: ${last.content}`;
         map[g.id] = { snippet, timestamp: last.createdAt };
       } else {
@@ -911,11 +923,11 @@ export function GroupChatView() {
             </div>
 
             {chatMessages.map((msg, index) => {
-              const isSystem = msg.senderName === "System";
+              const isSystem = isSystemNotificationMessage(msg);
               if (isSystem) {
                 return (
-                  <div key={msg.id || index} className="flex justify-center my-3">
-                    <div className="px-3 py-1 rounded-full bg-slate-100 dark:bg-neutral-800 text-[11px] font-medium text-slate-500 dark:text-slate-400 select-none">
+                  <div key={msg.id || index} className="flex justify-center my-3 select-none">
+                    <div className="px-3.5 py-1 rounded-full bg-slate-100/90 dark:bg-neutral-800/80 border border-slate-200/60 dark:border-neutral-700/60 text-xs font-medium text-slate-500 dark:text-slate-400 text-center max-w-[85%] break-words">
                       {msg.content}
                     </div>
                   </div>
@@ -939,7 +951,7 @@ export function GroupChatView() {
               const isSameSenderAsPrev = Boolean(
                 prevMsg &&
                 prevMsg.senderName &&
-                prevMsg.senderName !== "System" &&
+                !isSystemNotificationMessage(prevMsg) &&
                 (isSelf(prevMsg.senderName) === isMe) &&
                 (isMe || prevMsg.senderName.trim().toLowerCase() === cleanSender)
               );
@@ -947,7 +959,7 @@ export function GroupChatView() {
               const isSameSenderAsNext = Boolean(
                 nextMsg &&
                 nextMsg.senderName &&
-                nextMsg.senderName !== "System" &&
+                !isSystemNotificationMessage(nextMsg) &&
                 (isSelf(nextMsg.senderName) === isMe) &&
                 (isMe || nextMsg.senderName.trim().toLowerCase() === cleanSender)
               );
