@@ -15,7 +15,6 @@ import {
 } from '@/types';
 import { getSupabaseClient, saveSupabaseConfig } from '@/lib/supabase';
 import { findUserByUsername, fetchUserProfileFromDatabase, validateUsernameFormat } from '@/lib/users-directory';
-import { getGravatarUrl, isGoogleAvatarUrl } from '@/lib/avatar';
 import { formatCurrency } from '@/lib/currency';
 import {
   cacheItems,
@@ -682,12 +681,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const googlePhoto =
-        authUser.user_metadata?.avatar_url ||
-        authUser.user_metadata?.picture ||
-        '';
-      const gravatarPhoto = authUser.email ? getGravatarUrl(authUser.email) : '';
-
       const { data: profileRecord } = await client
         .from('profiles')
         .select('*')
@@ -697,18 +690,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       let effectiveProfile: UserProfile;
 
       if (profileRecord) {
-        const effectiveAvatar =
-          profileRecord.avatar_url ||
-          googlePhoto ||
-          gravatarPhoto ||
-          '';
         effectiveProfile = {
           id: profileRecord.id,
           email: profileRecord.email || authUser.email || '',
           fullName: profileRecord.full_name || authUser.user_metadata?.full_name || '',
           username: profileRecord.username || '',
-          avatarUrl: effectiveAvatar,
-          googleAvatarUrl: googlePhoto,
+          avatarUrl: profileRecord.avatar_url || '',
+          googleAvatarUrl: '',
           defaultCurrency: profileRecord.default_currency || 'USD',
           phone: profileRecord.phone || '',
           paymentHandle: profileRecord.payment_handle || '',
@@ -722,7 +710,6 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           notifyWeeklyDigest: profileRecord.notify_weekly_digest ?? false,
         };
       } else {
-        const effectiveAvatar = googlePhoto || gravatarPhoto || '';
         const initialName =
           authUser.user_metadata?.full_name ||
           authUser.user_metadata?.name ||
@@ -733,7 +720,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           email: authUser.email || '',
           full_name: initialName,
           username: initialUsername,
-          avatar_url: effectiveAvatar,
+          avatar_url: '',
           default_currency: 'USD',
           phone: '',
           payment_handle: '',
@@ -752,8 +739,8 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
           email: newProfile.email,
           fullName: newProfile.full_name,
           username: newProfile.username,
-          avatarUrl: newProfile.avatar_url,
-          googleAvatarUrl: googlePhoto,
+          avatarUrl: '',
+          googleAvatarUrl: '',
           defaultCurrency: newProfile.default_currency,
           phone: newProfile.phone,
           paymentHandle: newProfile.payment_handle,
@@ -777,11 +764,38 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
       const userFullName = (effectiveProfile.fullName || authUser.user_metadata?.full_name || '').trim().toLowerCase();
       const userHandle = (effectiveProfile.username || '').trim().toLowerCase();
 
-      const [createdGroupsRes, allMembersRes, userFriendsRes] = await Promise.all([
+      const [createdGroupsRes, allMembersRes, userFriendsRes, allProfilesRes] = await Promise.all([
         client.from('groups').select('*').eq('created_by', authUser.id),
         client.from('group_members').select('*'),
         client.from('friends').select('*').or(`phone.eq.${authUser.id},phone.is.null`).order('created_at', { ascending: false }),
+        client.from('profiles').select('id, email, username, full_name, avatar_url'),
       ]);
+
+      const profileList = allProfilesRes.data || [];
+      const profileById = new Map<string, string>();
+      const profileByEmail = new Map<string, string>();
+      const profileByUsername = new Map<string, string>();
+      const profileByName = new Map<string, string>();
+
+      profileList.forEach((p) => {
+        const avatar = (p.avatar_url || '').trim();
+        if (!avatar) return;
+        if (p.id) profileById.set(p.id, avatar);
+        if (p.email) profileByEmail.set(p.email.trim().toLowerCase(), avatar);
+        if (p.username) profileByUsername.set(p.username.trim().toLowerCase(), avatar);
+        if (p.full_name) profileByName.set(p.full_name.trim().toLowerCase(), avatar);
+      });
+
+      const resolveProfileAvatar = (params: { id?: string; email?: string; username?: string; name?: string }) => {
+        if (params.id && profileById.has(params.id)) return profileById.get(params.id)!;
+        const cleanEmail = (params.email || '').trim().toLowerCase();
+        if (cleanEmail && profileByEmail.has(cleanEmail)) return profileByEmail.get(cleanEmail)!;
+        const cleanUsername = (params.username || '').trim().toLowerCase();
+        if (cleanUsername && profileByUsername.has(cleanUsername)) return profileByUsername.get(cleanUsername)!;
+        const cleanName = (params.name || '').trim().toLowerCase();
+        if (cleanName && profileByName.has(cleanName)) return profileByName.get(cleanName)!;
+        return '';
+      };
 
       const rawMembers = allMembersRes.data || [];
       const userGroupIds = new Set<string>();
@@ -806,7 +820,11 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         name: f.name,
         username: f.username || f.name.toLowerCase().replace(/[^a-z0-9]/g, '.'),
         email: f.email || '',
-        avatarUrl: f.avatar_url || (f.email ? getGravatarUrl(f.email) : ''),
+        avatarUrl: resolveProfileAvatar({
+          email: f.email || '',
+          username: f.username || '',
+          name: f.name || '',
+        }),
         netBalance: Number(f.net_balance) || 0,
         groupCount: Number(f.group_count) || 0,
         addedVia: f.added_via || 'directory',
@@ -884,12 +902,19 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
                 }).eq('id', m.id);
               }
 
+              const memberAvatar = isCurrent
+                ? (effectiveProfile.avatarUrl || '')
+                : resolveProfileAvatar({
+                    email: m.email || '',
+                    name: realName,
+                  });
+
               return {
                 id: m.id,
                 groupId: m.group_id,
                 name: realName,
                 email: m.email || (isCurrent ? effectiveProfile.email : ''),
-                avatarUrl: m.avatar_url || (m.email ? getGravatarUrl(m.email) : isCurrent ? effectiveProfile.avatarUrl || '' : ''),
+                avatarUrl: memberAvatar,
                 role: m.role === 'owner' || m.role === 'editor' || m.role === 'viewer' ? m.role : 'editor',
                 isCurrentUser: isCurrent,
               };
@@ -987,6 +1012,13 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             (currentUsername !== '' && rawSender === currentUsername) ||
             (currentHandle !== '' && rawSender === currentHandle);
 
+          const chatSenderAvatar = isSenderCurrent
+            ? (effectiveProfile.avatarUrl || '')
+            : resolveProfileAvatar({
+                username: c.sender_name,
+                name: c.sender_name,
+              });
+
           return {
             id: c.id,
             groupId: c.group_id,
@@ -994,7 +1026,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
               c.sender_name === 'You'
                 ? effectiveProfile.fullName || effectiveProfile.username || 'User'
                 : c.sender_name,
-            senderAvatarUrl: c.sender_avatar_url,
+            senderAvatarUrl: chatSenderAvatar,
             senderIsCurrentUser: isSenderCurrent,
             content: c.content,
             mentions: c.mentions || [],
@@ -2520,7 +2552,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         .split(/[._-]/)
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
-      let avatarUrl = getGravatarUrl(cleanEmail, 120);
+      let avatarUrl = '';
 
       if (client) {
         try {
@@ -2722,7 +2754,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
             id: member.id,
             name: member.name,
             username: generatedUsername,
-            avatarUrl: member.avatarUrl || (member.email ? getGravatarUrl(member.email) : ''),
+            avatarUrl: member.avatarUrl || '',
             email: member.email || '',
             groupCount: 1,
           });
@@ -2750,7 +2782,7 @@ export function SplitestProvider({ children }: { children: React.ReactNode }) {
         ...friend,
         username: friendUsername,
         name: friend.name || friendUsername,
-        avatarUrl: friend.avatarUrl || (friend.email ? getGravatarUrl(friend.email) : ''),
+        avatarUrl: friend.avatarUrl || '',
       };
 
       setCustomFriends((prev) => {

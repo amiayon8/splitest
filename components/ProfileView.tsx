@@ -7,7 +7,6 @@ import {
   validateUsernameFormat,
   checkUsernameAvailability,
 } from "@/lib/users-directory";
-import { getGravatarUrl, isGoogleAvatarUrl, isGravatarUrl } from "@/lib/avatar";
 import {
   User,
   Mail,
@@ -114,15 +113,7 @@ export function ProfileView() {
     username || (userProfile.fullName ? userProfile.fullName.toLowerCase().replace(/[^a-z0-9]/g, ".") : "user")
   );
 
-  const normalizedEmail = email.trim().toLowerCase();
-  const gravatarPreviewUrl = normalizedEmail && normalizedEmail.includes("@") ? getGravatarUrl(normalizedEmail, 200) : "";
-  const googlePhotoUrl =
-    userProfile.googleAvatarUrl ||
-    (isGoogleAvatarUrl(userProfile.avatarUrl) ? userProfile.avatarUrl : "");
-
-  const activeAvatar = avatarUrl || googlePhotoUrl || gravatarPreviewUrl || "";
-  const isGoogleActive = !!googlePhotoUrl && activeAvatar === googlePhotoUrl;
-  const isGravatarActive = !isGoogleActive && (activeAvatar === gravatarPreviewUrl || isGravatarUrl(activeAvatar));
+  const activeAvatar = avatarUrl;
 
   const handleCopyLink = async () => {
     try {
@@ -143,11 +134,7 @@ export function ProfileView() {
     }
 
     setIsSaving(true);
-    const resolvedAvatar =
-      avatarUrl ||
-      (isGoogleActive ? googlePhotoUrl : "") ||
-      gravatarPreviewUrl ||
-      "";
+    const resolvedAvatar = avatarUrl.trim();
 
     const result = await updateUserProfile({
       fullName,
@@ -227,16 +214,6 @@ export function ProfileView() {
                 <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   {fullName || "User"}
                 </h2>
-                {isGoogleActive && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
-                    Google Photo
-                  </span>
-                )}
-                {isGravatarActive && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
-                    Gravatar
-                  </span>
-                )}
               </div>
               {email && (
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -246,110 +223,33 @@ export function ProfileView() {
             </div>
           </div>
 
-          <div className="pt-2 space-y-2">
+          <div className="pt-2 space-y-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Profile Photo Source
+                Avatar Image URL
               </label>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Select whether your profile image is sourced from Google or your email Gravatar
+                Set a direct image link to display your avatar from your profile record
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  if (gravatarPreviewUrl) {
-                    setAvatarUrl(gravatarPreviewUrl);
-                  }
-                }}
-                className={`relative flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
-                  isGravatarActive
-                    ? "border-[#059669] bg-emerald-50/40 dark:bg-emerald-950/20 shadow-xs"
-                    : "border-slate-200 dark:border-slate-700/80 bg-[#F8FAFC] dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600"
-                }`}
-              >
-                <div className="shrink-0">
-                  {gravatarPreviewUrl ? (
-                    <img
-                      src={gravatarPreviewUrl}
-                      alt="Gravatar preview"
-                      className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-500 flex items-center justify-center text-xs font-medium">
-                      MP
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                      Gravatar
-                    </span>
-                    {isGravatarActive && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                    {normalizedEmail || "Set contact email"}
-                  </p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    Globally recognized avatar
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (googlePhotoUrl) {
-                    setAvatarUrl(googlePhotoUrl);
-                  } else {
-                    syncGoogleAccount();
-                  }
-                }}
-                className={`relative flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
-                  isGoogleActive
-                    ? "border-[#059669] bg-emerald-50/40 dark:bg-emerald-950/20 shadow-xs"
-                    : "border-slate-200 dark:border-slate-700/80 bg-[#F8FAFC] dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600"
-                }`}
-              >
-                <div className="shrink-0">
-                  {googlePhotoUrl ? (
-                    <img
-                      src={googlePhotoUrl}
-                      alt="Google avatar"
-                      className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-base border border-blue-200 dark:border-blue-900">
-                      G
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                      Google Account
-                    </span>
-                    {isGoogleActive && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                    {googlePhotoUrl
-                      ? userProfile.googleEmail || "Connected Google account"
-                      : "Click to link Google"}
-                  </p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    {googlePhotoUrl ? "Synced from Google" : "OAuth profile picture"}
-                  </p>
-                </div>
-              </button>
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                value={avatarUrl}
+                onChange={(e) => setAvatarUrl(e.target.value)}
+                placeholder="https://example.com/avatar.jpg"
+                className="flex-1 h-10 px-3.5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
+              />
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => setAvatarUrl("")}
+                  className="px-3.5 h-10 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-800 transition-colors shrink-0"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
 

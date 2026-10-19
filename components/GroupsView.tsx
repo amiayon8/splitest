@@ -6,7 +6,6 @@ import { formatCurrency } from '@/lib/currency';
 import { calculateMemberBalances, calculateDirectDebts, getCurrentUserBalance, getCurrentUserMemberName, isMemberCurrentUser } from '@/lib/split-calculator';
 import { WalletCardDeck } from '@/components/WalletCardDeck';
 import { buildProfileShareUrl } from '@/lib/users-directory';
-import { getGravatarUrl } from '@/lib/avatar';
 import {
   Plus,
   ArrowRight,
@@ -139,7 +138,7 @@ export function GroupsView() {
         friendsMap.set(friendKey, {
           name: friend.name || friend.username || 'Friend',
           username: friend.username,
-          avatarUrl: friend.avatarUrl || (friend.email ? getGravatarUrl(friend.email) : ''),
+          avatarUrl: friend.avatarUrl || '',
           netBalance: friend.netBalance || 0,
           groupCount: friend.groupCount || 0,
         });

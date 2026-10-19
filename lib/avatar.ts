@@ -173,11 +173,8 @@ function md5(string: string): string {
   return (wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d)).toLowerCase();
 }
 
-export function getGravatarUrl(email: string, size = 160): string {
-  const normalized = email.trim().toLowerCase();
-  if (!normalized) return '';
-  const hash = md5(normalized);
-  return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=mp`;
+export function getGravatarUrl(_email: string, _size = 160): string {
+  return '';
 }
 
 export function isGoogleAvatarUrl(url?: string | null): boolean {
@@ -196,17 +193,8 @@ export function resolveAvatarUrl(params: {
   googleAvatarUrl?: string | null;
   size?: number;
 }): string {
-  if (params.avatarUrl && (isGoogleAvatarUrl(params.avatarUrl) || isGravatarUrl(params.avatarUrl))) {
-    return params.avatarUrl;
-  }
-  if (params.googleAvatarUrl && isGoogleAvatarUrl(params.googleAvatarUrl)) {
-    return params.googleAvatarUrl;
-  }
-  if (params.avatarUrl && params.avatarUrl.startsWith('http')) {
-    return params.avatarUrl;
-  }
-  if (params.email && params.email.includes('@')) {
-    return getGravatarUrl(params.email, params.size || 160);
+  if (params.avatarUrl && params.avatarUrl.trim()) {
+    return params.avatarUrl.trim();
   }
   return '';
 }

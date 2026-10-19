@@ -1,6 +1,5 @@
 import { FriendContact, UserProfile } from "@/types";
 import { getSupabaseClient } from "@/lib/supabase";
-import { getGravatarUrl } from "@/lib/avatar";
 
 export interface PublicUserProfile extends FriendContact {
   bio?: string;
@@ -113,7 +112,7 @@ export function findUserByUsername(
         name: currentUser.fullName,
         username: currentUser.username || normalized,
         email: currentUser.email,
-        avatarUrl: currentUser.avatarUrl || (currentUser.email ? getGravatarUrl(currentUser.email) : ""),
+        avatarUrl: currentUser.avatarUrl || "",
         netBalance: 0,
         groupCount: 0,
         addedVia: "link",
@@ -195,7 +194,7 @@ function mapDatabaseProfile(data: Record<string, any>, fallbackUsername: string)
     name: data.full_name || data.username || "User",
     username: data.username || fallbackUsername,
     email: data.email || "",
-    avatarUrl: data.avatar_url || (data.email ? getGravatarUrl(data.email) : ""),
+    avatarUrl: data.avatar_url || "",
     bio: data.bio || undefined,
     netBalance: 0,
     groupCount: 0,

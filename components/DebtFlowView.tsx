@@ -388,12 +388,8 @@ export function DebtFlowView() {
             filteredDebts.map((item, index) => {
               const isYouDebtor = isMemberCurrentUser(item.debtor, currentGroup, userProfile);
               const isYouCreditor = isMemberCurrentUser(item.creditor, currentGroup, userProfile);
-              const debtorAvatar =
-                memberAvatarMap.get(item.debtor.toLowerCase()) ||
-                `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(item.debtor)}`;
-              const creditorAvatar =
-                memberAvatarMap.get(item.creditor.toLowerCase()) ||
-                `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(item.creditor)}`;
+              const debtorAvatar = memberAvatarMap.get(item.debtor.toLowerCase()) || '';
+              const creditorAvatar = memberAvatarMap.get(item.creditor.toLowerCase()) || '';
               const reminderKey = `${item.debtor}-${item.amount}`;
               const isReminded = remindedCreditors[reminderKey];
 
@@ -410,11 +406,17 @@ export function DebtFlowView() {
                 >
                   <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 min-w-0">
                     <div className="flex items-center gap-3 min-w-[180px]">
-                      <img
-                        src={debtorAvatar}
-                        alt={item.debtor}
-                        className="w-10 h-10 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                      />
+                      {debtorAvatar ? (
+                        <img
+                          src={debtorAvatar}
+                          alt={item.debtor}
+                          className="w-10 h-10 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-xs uppercase border border-slate-200 dark:border-slate-700 shrink-0">
+                          {item.debtor.charAt(0)}
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
@@ -446,11 +448,17 @@ export function DebtFlowView() {
                     </div>
 
                     <div className="flex items-center gap-3 min-w-[180px]">
-                      <img
-                        src={creditorAvatar}
-                        alt={item.creditor}
-                        className="w-10 h-10 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                      />
+                      {creditorAvatar ? (
+                        <img
+                          src={creditorAvatar}
+                          alt={item.creditor}
+                          className="w-10 h-10 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-xs uppercase border border-slate-200 dark:border-slate-700 shrink-0">
+                          {item.creditor.charAt(0)}
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
@@ -532,9 +540,7 @@ export function DebtFlowView() {
           <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
             {sortedMemberSummaries.map((summary) => {
               const isCurrentUser = isMemberCurrentUser(summary.memberName, currentGroup, userProfile);
-              const avatar =
-                memberAvatarMap.get(summary.memberName.toLowerCase()) ||
-                `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(summary.memberName)}`;
+              const avatar = memberAvatarMap.get(summary.memberName.toLowerCase()) || '';
               const isCreditor = summary.netBalance > 0.01;
               const isDebtor = summary.netBalance < -0.01;
 
@@ -544,11 +550,17 @@ export function DebtFlowView() {
                   className="py-3 flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={avatar}
-                      alt={summary.memberName}
-                      className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                    />
+                    {avatar ? (
+                      <img
+                        src={avatar}
+                        alt={summary.memberName}
+                        className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-xs uppercase border border-slate-200 dark:border-slate-700 shrink-0">
+                        {summary.memberName.charAt(0)}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-slate-900 dark:text-slate-100 truncate">
